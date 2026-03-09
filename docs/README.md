@@ -1,3 +1,24 @@
+# NOTICE: BCML has been discontinued
+
+BCML is a very old, very inefficient solution for overall mod management, which
+is a role it was not originally meant for. There are several issues with it that
+are unable to be solved, on a fundamental level.
+
+Among these issues, the most pertinent is that BCML adds bugs to the merged mods
+that do not exist in the mods, themselves, causing actors to fail to load, causing
+panic moons, and, in extreme cases, causing crashes.
+
+Several years ago, we wrote [UKMM](https://github.com/GingerAvalanche/ukmm/tree/master)
+to solve these issues, and more. Though it is still in beta, it is already the more
+capable mod manager, containing many more features, bug fixes, improvements, and
+all-around capabilities.
+
+Please use that, instead of trying to download or fork this.
+
+And if you *do* decide to use this, then please, for the love of all things holy, don't
+patch 3.10.8 - go back and branch off of the 3.10.4 commit, from before support was
+removed for 60%+ of the mods in the BotW ecosystem.
+
 ![BCML Logo](https://i.imgur.com/OiqKPx0.png)
 
 # BCML: BOTW Cross-Platform Mod Loader
