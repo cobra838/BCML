@@ -10,6 +10,8 @@ author = "NiceneNerd"
 author_email = "macadamiadaze@gmail.com"
 license = { file = "docs/LICENSE.md" }
 dependencies = [
+    "aamp~=1.4.1",
+    "byml~=2.4.2",
     "botw-utils~=0.2.3",
     "cefpython3~=66.1; platform_system == 'Windows'",
     "oead~=1.2.6",
@@ -19,6 +21,7 @@ dependencies = [
     "pyqtwebengine~=5.15.2; platform_system == 'Linux'",
     "pywebview==3.7.2",
     "QtPy; platform_system == 'Linux'",
+    "PyYAML~=6.0",
     "requests~=2.27.1",
     "rstb>=1.2.2",
     "xxhash~=3.2",

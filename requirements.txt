@@ -1,3 +1,5 @@
+aamp~=1.4.1
+byml~=2.4.2
 botw-utils~=0.2.3
 cefpython3~=66.1; platform_system == 'Windows'
 oead~=1.2.6
@@ -7,6 +9,7 @@ PyQt5; platform_system == 'Linux'
 pyqtwebengine; platform_system == 'Linux'
 pywebview==3.7.2
 QtPy; platform_system == 'Linux'
+PyYAML~=6.0
 requests~=2.26.0
 rstb>=1.2.2
 xxhash~=3.2
