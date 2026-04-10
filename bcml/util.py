@@ -527,7 +527,7 @@ def get_python_exe(gui: bool) -> Path:
 
 @lru_cache(1)
 def get_is_portable_mode() -> bool:
-    return "--portable" in sys.argv
+    return "--portable" in sys.argv or getattr(sys, "frozen", False)
 
 
 @lru_cache(None)
