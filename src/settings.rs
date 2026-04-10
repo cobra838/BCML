@@ -269,15 +269,34 @@ pub static TMP_SETTINGS: Lazy<Arc<RwLock<Settings>>> = Lazy::new(|| {
     }))
 });
 
+fn is_portable_mode() -> bool {
+    if std::env::args().any(|f| f == "--normal") {
+        return false;
+    }
+    if std::env::args().any(|f| f == "--portable") {
+        return true;
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.file_stem().map(|stem| stem.to_string_lossy().to_ascii_lowercase()))
+        .map(|stem| !stem.starts_with("python"))
+        .unwrap_or(false)
+}
+
 pub static DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    if std::env::args().any(|f| &f == "--portable") {
-        std::env::current_dir()
-            .expect("Big problems if no cwd")
+    if is_portable_mode() {
+        std::env::current_exe()
+            .expect("Big problems if no executable path")
+            .parent()
+            .expect("Big problems if no executable parent")
             .join("bcml-data")
     } else if cfg!(windows) {
-        dirs2::data_local_dir().expect("Big problems if no local data dir")
+        dirs2::data_local_dir()
+            .expect("Big problems if no local data dir")
+            .join("bcml")
     } else {
-        dirs2::config_dir().expect("Big problems if no config dir")
+        dirs2::config_dir()
+            .expect("Big problems if no config dir")
+            .join("bcml")
     }
-    .join("bcml")
 });

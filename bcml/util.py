@@ -505,6 +505,13 @@ def get_exec_dir() -> Path:
     return Path(os.path.dirname(os.path.realpath(__file__)))
 
 
+@lru_cache(1)
+def get_portable_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(os.getcwd())
+
+
 @lru_cache(2)
 def get_python_exe(gui: bool) -> Path:
     embedded = [
@@ -527,13 +534,15 @@ def get_python_exe(gui: bool) -> Path:
 
 @lru_cache(1)
 def get_is_portable_mode() -> bool:
+    if "--normal" in sys.argv:
+        return False
     return "--portable" in sys.argv or getattr(sys, "frozen", False)
 
 
 @lru_cache(None)
 def get_data_dir() -> Path:
     if get_is_portable_mode():
-        data_dir = Path(os.getcwd()) / "bcml-data"
+        data_dir = get_portable_dir() / "bcml-data"
     elif system() == "Windows":
         data_dir = Path(os.path.expandvars("%LOCALAPPDATA%")) / "bcml"
     else:
