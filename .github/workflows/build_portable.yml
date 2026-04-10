@@ -1,0 +1,121 @@
+name: Build BCML with Portable Python
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  PORTABLE_PYTHON_URL: https://github.com/bjia56/portable-python/releases/download/cpython-v3.9.25-build.0/python-full-3.9.25-windows-x86_64.zip
+  PORTABLE_PYTHON_DIR: ${{ github.workspace }}\python
+
+jobs:
+  build_windows_portable:
+    name: Build (Portable Python, Windows)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download portable Python
+        run: |
+          Invoke-WebRequest -Uri "$env:PORTABLE_PYTHON_URL" -OutFile "portable_python.zip"
+          Expand-Archive -Path "portable_python.zip" -DestinationPath "${{ github.workspace }}"
+          Rename-Item "${{ github.workspace }}\python-full-3.9.25-windows-x86_64" "${{ github.workspace }}\python"
+
+      - name: Locate python.exe
+        run: |
+          $py = (Get-ChildItem -Path "$env:PORTABLE_PYTHON_DIR" -Recurse -Filter "python.exe" |
+                  Where-Object { $_.FullName -notmatch "Scripts" } |
+                  Select-Object -First 1).FullName
+          echo "PYTHON_EXE=$py" >> $env:GITHUB_ENV
+          & $py --version
+
+      - name: Bootstrap pip
+        run: |
+          & "$env:PYTHON_EXE" -m ensurepip --upgrade
+          & "$env:PYTHON_EXE" -m pip install --upgrade pip wheel setuptools
+
+      - name: Install Python dependencies
+        run: |
+          & "$env:PYTHON_EXE" -m pip install -r requirements.txt
+          & "$env:PYTHON_EXE" -m pip install "maturin>=0.12,<0.13" mkdocs mkdocs-material pyinstaller
+          & "$env:PYTHON_EXE" -m pip install "packaging~=21.3" "requests~=2.26.0"
+
+      - name: Install Rust nightly
+        run: |
+          rustup set profile default
+          rustup toolchain install nightly-2023-04-20 --component rustfmt --component rust-src
+          rustup override set nightly-2023-04-20
+          rustc --version
+          cargo --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18.x"
+          cache: npm
+          cache-dependency-path: bcml/assets/package-lock.json
+
+      - name: Build frontend assets
+        working-directory: bcml/assets
+        run: |
+          npm install
+          npm run build
+
+      - name: Build docs
+        run: |
+          & "$env:PYTHON_EXE" -m mkdocs build -d ./bcml/assets/help
+
+      - name: Build Rust extension (maturin)
+        run: |
+          if (Test-Path "Cargo.lock") { Remove-Item "Cargo.lock" -Force }
+          $mat = Join-Path "${{ github.workspace }}" "python\Scripts\maturin.exe"
+          & $mat build --release --interpreter "$env:PYTHON_EXE"
+
+      - name: Install built wheel
+        run: |
+          $wheel = (Get-ChildItem -Path "target\wheels" -Filter "*.whl" | Select-Object -Last 1).FullName
+          & "$env:PYTHON_EXE" -m pip install "$wheel"
+
+      - name: Build exe
+        run: |
+          $pyd = (Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Filter "bcml*.pyd" | Select-Object -First 1).FullName
+          echo "Found pyd: $pyd"
+          Copy-Item $pyd -Destination "${{ github.workspace }}\bcml\"
+          $aampData = & "$env:PYTHON_EXE" -c "import aamp, pathlib; print(pathlib.Path(aamp.__file__).resolve().parent / 'botw_hashed_names.txt')"
+          if (-not (Test-Path $aampData)) {
+            throw "aamp data file not found: $aampData"
+          }
+          & "$env:PYTHON_EXE" -m PyInstaller --onedir --windowed --name BCML `
+            --collect-all bcml `
+            --collect-all aamp `
+            --collect-all byml `
+            --collect-all botw_utils `
+            --collect-all rstb `
+            --collect-all cefpython3 `
+            --add-data "${aampData};aamp" `
+            bcml/__main__.py
+          $distRoot = Join-Path "${{ github.workspace }}" "dist\BCML\_internal"
+          $prunePaths = @(
+            (Join-Path $distRoot "bcml\assets\node_modules"),
+            (Join-Path $distRoot "bcml\assets\src"),
+            (Join-Path $distRoot "cefpython3\examples")
+          )
+          foreach ($path in $prunePaths) {
+            if (Test-Path $path) {
+              Remove-Item $path -Recurse -Force
+            }
+          }
+          Get-ChildItem (Join-Path $distRoot "cefpython3") -Filter "cefpython_py*.pyd" | Where-Object {
+            $_.Name -notlike "*py39*"
+          } | Remove-Item -Force
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: BCML
+          path: dist/BCML/

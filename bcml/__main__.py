@@ -2,7 +2,7 @@ import os
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
-from multiprocessing import set_start_method, Process
+from multiprocessing import set_start_method, Process, freeze_support
 from os import chmod  # pylint: disable=ungrouped-imports
 from pathlib import Path
 from random import randint
@@ -49,14 +49,28 @@ def configure_cef(debug):
     )
 
     cache = util.get_storage_dir() / "cef_cache"
-    settings.update(
-        {"cache_path": str(cache), "context_menu": {"enabled": debug, "devtools": True}}
-    )
+    cef_settings = {
+        "cache_path": str(cache),
+        "context_menu": {"enabled": debug, "devtools": True},
+    }
+    if getattr(sys, "frozen", False):
+        bundle_dir = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+        cef_bundle = bundle_dir / "cefpython3"
+        if cef_bundle.exists():
+            cef_settings.update(
+                {
+                    "resources_dir_path": str(cef_bundle),
+                    "locales_dir_path": str(cef_bundle / "locales"),
+                    "browser_subprocess_path": str(cef_bundle / "subprocess.exe"),
+                }
+            )
+    settings.update(cef_settings)
     if not cache.exists():
         cache.mkdir(parents=True, exist_ok=True)
 
 
 def main(debug: bool = False):
+    freeze_support()
     set_start_method("spawn", True)
     global logger  # pylint: disable=invalid-name,global-statement
     logger = None
