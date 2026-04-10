@@ -16,9 +16,22 @@ jobs:
   build_windows_portable:
     name: Build (Portable Python, Windows)
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content pyproject.toml | Select-String '^version = ' | Select-Object -First 1).ToString().Split('"')[1]
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "tag=v$version" >> $env:GITHUB_OUTPUT
+          echo "artifact_name=BCML_$($version)_portable" >> $env:GITHUB_OUTPUT
+          echo "archive_name=BCML_$($version)_portable.zip" >> $env:GITHUB_OUTPUT
+          Write-Host "Building BCML $version"
 
       - name: Download portable Python
         run: |
@@ -114,8 +127,28 @@ jobs:
             $_.Name -notlike "*py39*"
           } | Remove-Item -Force
 
-      - name: Upload exe
+      - name: Package portable build
+        shell: pwsh
+        run: |
+          $archive = "${{ steps.version.outputs.archive_name }}"
+          if (Test-Path $archive) {
+            Remove-Item $archive -Force
+          }
+          Compress-Archive -Path "dist\\BCML\\*" -DestinationPath $archive -CompressionLevel Optimal
+          Write-Host "Created $archive ($('{0:N0}' -f (Get-Item $archive).Length) bytes)"
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BCML
-          path: dist/BCML/
+          name: ${{ steps.version.outputs.artifact_name }}
+          path: ${{ steps.version.outputs.archive_name }}
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: BCML ${{ steps.version.outputs.version }}
+          files: ${{ steps.version.outputs.archive_name }}
+          body: |
+            Portable build for BCML ${{ steps.version.outputs.version }}.
