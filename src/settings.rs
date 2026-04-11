@@ -121,7 +121,11 @@ pub struct Settings {
 
 #[inline]
 fn default_store_dir() -> PathBuf {
-    DATA_DIR.clone()
+    if is_portable_mode() {
+        PathBuf::from("bcml-data")
+    } else {
+        DATA_DIR.clone()
+    }
 }
 
 #[inline]

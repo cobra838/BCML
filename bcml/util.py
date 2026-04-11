@@ -587,7 +587,7 @@ DEFAULT_SETTINGS = {
     "update_dir": "",
     "dlc_dir": "",
     "dlc_dir_nx": "",
-    "store_dir": str(get_data_dir()),
+    "store_dir": "bcml-data" if get_is_portable_mode() else str(get_data_dir()),
     "export_dir": "",
     "export_dir_nx": "",
     "export_method": "hard_link",
@@ -631,7 +631,9 @@ def get_settings(name: str = "") -> Any:
                     if k not in settings:
                         settings[k] = v
                 if settings["store_dir"] == "" or not settings["store_dir"]:
-                    settings["store_dir"] = str(get_data_dir())
+                    settings["store_dir"] = (
+                        "bcml-data" if get_is_portable_mode() else str(get_data_dir())
+                    )
                 if "export_method" not in settings:
                     settings["export_method"] = (
                         "copy" if settings.get("no_hardlinks") else "hard_link"
