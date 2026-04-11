@@ -130,12 +130,9 @@ def main(debug: bool = False):
             ][randint(0, 4)]
         ) + "?autoplay=1"
         width, height = 640, 360
-    elif (util.get_data_dir() / "settings.json").exists():
+    else:
         url = f"{host}/index.html"
         width, height = 907, 680
-    else:
-        url = f"{host}/index.html?firstrun=yes"
-        width, height = 750, 600
 
     api.window = webview.create_window(
         "BOTW Cross-Platform Mod Loader",

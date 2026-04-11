@@ -496,8 +496,6 @@ def sanity_check():
     get_game_dir()
     if settings["wiiu"]:
         get_update_dir()
-    if not settings["no_cemu"]:
-        get_cemu_dir()
 
 
 @lru_cache(1)

@@ -33,7 +33,7 @@ class FirstRun extends React.Component {
             modProgress: "",
             error: null,
             showError: false,
-            willRead: false
+            willRead: true
         };
         this.goBack = () => {
             const page = this.state.page - 1;
