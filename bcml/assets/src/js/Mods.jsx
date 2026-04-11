@@ -30,13 +30,8 @@ class Mods extends React.Component {
             mergers: [],
             hasCemu: false
         };
-        window.addEventListener("pywebviewready", () =>
-            pywebview.api
-                .get_setup()
-                .then(setup =>
-                    this.setState({ mergersReady: true, ...setup }, this.sanityCheck)
-                )
-        );
+        this.loadSetup = this.loadSetup.bind(this);
+        window.addEventListener("pywebviewready", this.loadSetup);
         window.handleKeyMods = e => {
             if (e.ctrlKey) {
                 switch (e.key) {
@@ -90,6 +85,24 @@ class Mods extends React.Component {
         };
         document.addEventListener("dragover", e => e.preventDefault());
         document.addEventListener("drop", this.handleDrop);
+    }
+
+    componentDidMount() {
+        if (window.pywebview?.api) {
+            this.loadSetup();
+        }
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener("pywebviewready", this.loadSetup);
+    }
+
+    loadSetup() {
+        pywebview.api
+            .get_setup()
+            .then(setup =>
+                this.setState({ mergersReady: true, ...setup }, this.sanityCheck)
+            );
     }
 
     defaultSelect = () => {
@@ -532,13 +545,20 @@ class Mods extends React.Component {
                                     <OverlayTrigger
                                         overlay={
                                             <Tooltip>
-                                                Launch Breath of the Wild (Ctrl+L)
+                                                {this.context.settings?.wiiu
+                                                    ? "Launch Breath of the Wild (Ctrl+L)"
+                                                    : "Launch EMU (Ctrl+L)"}
                                             </Tooltip>
                                         }>
                                         <Button
                                             variant="primary"
                                             size="xs"
-                                            onClick={this.props.onLaunch}>
+                                            onClick={this.props.onLaunch}
+                                            title={
+                                                this.context.settings?.wiiu
+                                                    ? "Launch Breath of the Wild"
+                                                    : "Launch EMU"
+                                            }>
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 x="0px"
@@ -581,11 +601,15 @@ class Mods extends React.Component {
                                     />
                                     <Dropdown.Menu>
                                         <Dropdown.Item onClick={this.launchNoMod}>
-                                            Launch without mods
+                                            {this.context.settings?.wiiu
+                                                ? "Launch without mods"
+                                                : "Launch EMU"}
                                         </Dropdown.Item>
-                                        <Dropdown.Item onClick={this.launchCemu}>
-                                            Launch Cemu without starting game
-                                        </Dropdown.Item>
+                                        {this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.launchCemu}>
+                                                Launch EMU without starting game
+                                            </Dropdown.Item>
+                                        )}
                                     </Dropdown.Menu>
                                 </Dropdown>
                             )}

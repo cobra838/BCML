@@ -47,7 +47,7 @@ class FolderInput extends React.Component {
     }
 
     folderPick() {
-        pywebview.api.get_folder().then(folder => this.setState({ value: folder }));
+        pywebview.api.get_folder({ type: this.id }).then(folder => this.setState({ value: folder || "" }));
     }
 
     handleChange(e) {

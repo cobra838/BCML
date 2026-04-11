@@ -645,8 +645,9 @@ def get_settings(name: str = "") -> Any:
                 ):
                     settings["export_dir"] = str(Path(settings["export_dir"]).parent)
                 if settings["cemu_dir"] and not settings["no_cemu"] and not settings["export_dir"]:
+                    emu_path = Path(settings["cemu_dir"])
                     settings["export_dir"] = str(
-                        Path(settings["cemu_dir"])
+                        (emu_path.parent if emu_path.suffix.lower() == ".exe" else emu_path)
                         / "graphicPacks"
                     )
             setattr(get_settings, "settings", settings)
@@ -662,11 +663,27 @@ def save_settings():
         json.dump(get_settings.settings, s_file, indent=2)
 
 
+def get_emu_executable() -> Path:
+    emu_path = str(get_settings("cemu_dir"))
+    if not emu_path:
+        raise FileNotFoundError(
+            "The emulator executable has moved or not been saved yet."
+        )
+    path = Path(emu_path)
+    if path.is_file():
+        return path
+    if path.is_dir():
+        for exe in sorted(path.glob("*.exe")):
+            if "cemu" in exe.name.lower():
+                return exe
+        raise FileNotFoundError(
+            "The emulator executable could not be found in the selected folder."
+        )
+    raise FileNotFoundError("The emulator executable has moved or not been saved yet.")
+
+
 def get_cemu_dir() -> Path:
-    cemu_dir = str(get_settings("cemu_dir"))
-    if not cemu_dir or not Path(cemu_dir).is_dir():
-        raise FileNotFoundError("The Cemu directory has moved or not been saved yet.")
-    return Path(cemu_dir)
+    return get_emu_executable().parent
 
 
 def set_cemu_dir(path: Path):

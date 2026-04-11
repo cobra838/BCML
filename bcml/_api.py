@@ -83,27 +83,50 @@ class Api:
     def sanity_check(self, kwargs=None):
         util.sanity_check()
 
-    def get_folder(self):
+    def get_folder(self, params=None):
         if SYSTEM == "Windows":
             from tkinter import filedialog
             from tkinter import Tk
 
             root = Tk()
             root.attributes("-alpha", 0.0)
-            folder = filedialog.askdirectory(parent=root)
-            return folder if folder != "" else None
+            if params and params.get("type") == "cemu_dir":
+                path = filedialog.askopenfilename(
+                    parent=root,
+                    filetypes=(
+                        ("Executable (*.exe)", "*.exe"),
+                        ("All files (*.*)", "*.*"),
+                    ),
+                )
+            else:
+                path = filedialog.askdirectory(parent=root)
+            return path if path != "" else None
         else:
-            return self.window.create_file_dialog(webview.FOLDER_DIALOG)[0]
+            if params and params.get("type") == "cemu_dir":
+                result = self.window.create_file_dialog(
+                    webview.OPEN_DIALOG,
+                    file_types=(
+                        ("Executable (*.exe)",),
+                        ("All files (*.*)",),
+                    ),
+                    allow_multiple=False,
+                )
+            else:
+                result = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+            return result[0] if result else None
 
     def dir_exists(self, params):
         if not params["folder"]:
             return False
+        if params["type"] == "cemu_dir":
+            path = Path(params["folder"])
+            if path.is_file():
+                return path.suffix.lower() == ".exe"
+            return path.is_dir() and any("cemu" in f.name.lower() for f in path.glob("*.exe"))
         path = Path(params["folder"])
         real_folder = path.exists() and path.is_dir() and params["folder"] != ""
         if not real_folder:
             return False
-        if params["type"] == "cemu_dir":
-            return len(list(path.glob("?emu*.exe"))) > 0
         if "game_dir" in params["type"]:
             return (path / "Pack" / "Dungeon000.pack").exists()
         if params["type"] == "update_dir":
@@ -138,6 +161,8 @@ class Api:
     def parse_cemu_settings(self, params):
         try:
             cemu = Path(params["folder"])
+            if cemu.is_file():
+                cemu = cemu.parent
             set_path = cemu / "settings.xml"
             settings: minidom = util.parse_cemu_settings(set_path)
             game_dir: Optional[Path] = None
@@ -283,8 +308,15 @@ class Api:
         }
 
     def get_setup(self):
+        has_emu = False
+        if not util.get_settings("no_cemu"):
+            try:
+                util.get_emu_executable()
+                has_emu = True
+            except FileNotFoundError:
+                has_emu = False
         return {
-            "hasCemu": not util.get_settings("no_cemu"),
+            "hasCemu": has_emu,
             "mergers": [m().friendly_name for m in mergers.get_mergers()],
         }
 
@@ -495,40 +527,35 @@ class Api:
 
     @win_or_lose
     def launch_game(self, params=None):
-        install.enable_bcml_gfx()
+        if util.get_settings("wiiu"):
+            install.enable_bcml_gfx()
         self.launch_cemu()
 
     @win_or_lose
     def launch_game_no_mod(self, params=None):
-        install.disable_bcml_gfx()
+        if util.get_settings("wiiu"):
+            install.disable_bcml_gfx()
         self.launch_cemu()
 
     @win_or_lose
     def launch_cemu(self, params=None):
         if not params:
             params = {"run_game": True}
-        cemu = next(
-            iter(
-                {
-                    f
-                    for f in util.get_cemu_dir().glob("*.exe")
-                    if "cemu" in f.name.lower()
-                }
-            )
-        )
-        uking = util.get_game_dir().parent / "code" / "U-King.rpx"
-        try:
-            assert uking.exists()
-        except AssertionError:
-            raise FileNotFoundError("Your BOTW executable could not be found")
+        emu = util.get_emu_executable()
         cemu_args: List[str]
+        if util.get_settings("wiiu") and params["run_game"]:
+            uking = util.get_game_dir().parent / "code" / "U-King.rpx"
+            try:
+                assert uking.exists()
+            except AssertionError:
+                raise FileNotFoundError("Your BOTW executable could not be found")
         if SYSTEM == "Windows":
-            cemu_args = [str(cemu)]
-            if params["run_game"]:
+            cemu_args = [str(emu)]
+            if util.get_settings("wiiu") and params["run_game"]:
                 cemu_args.extend(("-g", str(uking)))
         else:
-            cemu_args = ["wine", str(cemu)]
-            if params["run_game"]:
+            cemu_args = ["wine", str(emu)]
+            if util.get_settings("wiiu") and params["run_game"]:
                 cemu_args.extend(
                     (
                         "-g",

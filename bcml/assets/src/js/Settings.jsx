@@ -60,6 +60,7 @@ class Settings extends React.Component {
                 type: "update_dir"
             }));
         const cemuValid =
+            (!this.state.wiiu && this.state.cemu_dir == "") ||
             this.state.no_cemu ||
             (await pywebview.api.dir_exists({
                 folder: this.state.cemu_dir,
@@ -200,33 +201,38 @@ class Settings extends React.Component {
                 <Row>
                     <Col>
                         <Form.Group controlId="cemu_dir">
-                            <Form.Label>EMU Directory</Form.Label>
+                            <Form.Label>EMU Executable</Form.Label>
                             <FolderInput
                                 value={this.state.cemu_dir}
-                                disabled={!this.state.wiiu || this.state.no_cemu}
+                                disabled={this.state.wiiu && this.state.no_cemu}
                                 onChange={this.handleChange}
-                                placeholder='Tip: folder should contain "Cemu.exe"'
+                                placeholder='Tip: select an emulator .exe'
                                 isValid={
-                                    this.state.cemu_dir != "" || this.state.no_cemu
+                                    this.state.cemu_dir != "" ||
+                                    this.state.no_cemu ||
+                                    !this.state.wiiu
                                 }
                                 overlay={
                                     <Tooltip>
                                         {this.state.wiiu ? (
                                             <>
-                                                (Optional) The directory where your
-                                                emulator is installed. For Wii U this
-                                                should be the folder that directly
-                                                contains "Cemu.exe" and "settings.xml"
+                                                (Optional) Path to your emulator
+                                                For WiiU this
+                                                should usually
+                                                be <code>Cemu.exe</code>. BCML will use
+                                                the executable's parent folder for 
+                                                <code>settings.xml</code> and 
+                                                <code>graphicPacks</code>.
                                             </>
                                         ) : (
-                                            "Currently only used for emulator launching"
+                                            "Optional path to your Switch emulator executable. BCML will launch it without passing a game."
                                         )}
                                     </Tooltip>
                                 }
                             />
                             <Form.Control.Feedback type="invalid">
-                                A Cemu folder is required unless you check the no Cemu
-                                option
+                                An emulator executable is required unless you check the
+                                no Cemu option
                             </Form.Control.Feedback>
                         </Form.Group>
                     </Col>
@@ -496,8 +502,7 @@ class Settings extends React.Component {
                                     checked={!this.state.wiiu}
                                     onChange={e =>
                                         this.setState({
-                                            wiiu: !e.target.checked,
-                                            no_cemu: true
+                                            wiiu: !e.target.checked
                                         })
                                     }
                                 />
@@ -517,8 +522,7 @@ class Settings extends React.Component {
                                 placement={"left"}>
                                 <Form.Check
                                     type="checkbox"
-                                    disabled={!this.state.wiiu}
-                                    label="Use BCML without a Cemu installation"
+                                    label="Use BCML without an EMU installation"
                                     checked={this.state.no_cemu}
                                     onChange={this.handleChange}
                                 />
