@@ -283,13 +283,27 @@ fn is_portable_mode() -> bool {
         .unwrap_or(false)
 }
 
-pub static DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    if is_portable_mode() {
-        std::env::current_exe()
-            .expect("Big problems if no executable path")
+fn portable_data_dir() -> PathBuf {
+    let current_exe = std::env::current_exe().expect("Big problems if no executable path");
+    let exe_stem = current_exe
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    if std::env::args().any(|f| f == "--portable") && exe_stem.starts_with("python") {
+        std::env::current_dir()
+            .expect("Big problems if no current dir")
+            .join("bcml-data")
+    } else {
+        current_exe
             .parent()
             .expect("Big problems if no executable parent")
             .join("bcml-data")
+    }
+}
+
+pub static DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    if is_portable_mode() {
+        portable_data_dir()
     } else if cfg!(windows) {
         dirs2::data_local_dir()
             .expect("Big problems if no local data dir")
