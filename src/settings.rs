@@ -181,7 +181,16 @@ impl Settings {
     pub fn export_dir(&self) -> Option<PathBuf> {
         if self.wiiu {
             if self.no_cemu {
-                Some(self.export_dir.clone())
+                if self
+                    .export_dir
+                    .to_str()
+                    .map(|d| d.is_empty())
+                    .unwrap_or_default()
+                {
+                    None
+                } else {
+                    Some(self.export_dir.clone())
+                }
             } else {
                 #[cfg(target_os = "windows")]
                 return Some(self.cemu_dir.join("graphicPacks/BreathOfTheWild_BCML"));
@@ -189,7 +198,16 @@ impl Settings {
                 return Some("~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML".into());
             }
         } else {
-            Some(self.export_dir_nx.clone())
+            if self
+                .export_dir_nx
+                .to_str()
+                .map(|d| d.is_empty())
+                .unwrap_or_default()
+            {
+                None
+            } else {
+                Some(self.export_dir_nx.clone())
+            }
         }
     }
 
