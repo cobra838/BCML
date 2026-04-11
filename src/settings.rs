@@ -271,7 +271,7 @@ impl Settings {
         self.master_mod_dir().join(if self.wiiu {
             "content"
         } else {
-            "01007EF00011E000/romfs"
+            crate::util::SWITCH_CONTENT_PATH
         })
     }
 
@@ -279,7 +279,7 @@ impl Settings {
         self.master_mod_dir().join(if self.wiiu {
             "aoc/0010"
         } else {
-            "01007EF00011F001/romfs"
+            crate::util::SWITCH_DLC_PATH
         })
     }
 

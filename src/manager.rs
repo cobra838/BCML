@@ -307,17 +307,23 @@ impl<'py, 'set> ModLinker<'py, 'set> {
                     .join("BreathOfTheWild_BCML")
                     .join("romfs"),
             };
+            let targets = util::SWITCH_BASE_TITLE_IDS
+                .iter()
+                .map(|title_id| {
+                    (
+                        self.merged.join(util::SWITCH_CONTENT_PATH),
+                        title_root(title_id),
+                    )
+                })
+                .chain(util::SWITCH_DLC_TITLE_IDS.iter().map(|title_id| {
+                    (
+                        self.merged.join(util::SWITCH_DLC_PATH),
+                        title_root(title_id),
+                    )
+                }))
+                .collect();
             Some((
-                vec![
-                    (
-                        self.merged.join("01007EF00011E000/romfs"),
-                        title_root("01007EF00011E000"),
-                    ),
-                    (
-                        self.merged.join("01007EF00011F001/romfs"),
-                        title_root("01007EF00011F001"),
-                    ),
-                ],
+                targets,
                 None,
                 method,
             ))
