@@ -109,23 +109,18 @@ jobs:
             --collect-all byml `
             --collect-all botw_utils `
             --collect-all rstb `
-            --collect-all cefpython3 `
             --add-data "${aampData};aamp" `
             bcml/__main__.py
           $distRoot = Join-Path "${{ github.workspace }}" "dist\BCML\_internal"
           $prunePaths = @(
             (Join-Path $distRoot "bcml\assets\node_modules"),
-            (Join-Path $distRoot "bcml\assets\src"),
-            (Join-Path $distRoot "cefpython3\examples")
+            (Join-Path $distRoot "bcml\assets\src")
           )
           foreach ($path in $prunePaths) {
             if (Test-Path $path) {
               Remove-Item $path -Recurse -Force
             }
           }
-          Get-ChildItem (Join-Path $distRoot "cefpython3") -Filter "cefpython_py*.pyd" | Where-Object {
-            $_.Name -notlike "*py39*"
-          } | Remove-Item -Force
 
       - name: Package portable build
         shell: pwsh

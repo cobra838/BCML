@@ -103,19 +103,12 @@ def main(debug: bool = False):
 
     gui: str
     if SYSTEM == "Windows":
-        try:
-            import cefpython3
+        from webview.platforms.winforms import _is_chromium
 
-            del cefpython3
-            gui = "cef"
-            configure_cef(debug)
-        except (ImportError, Exception):
-            from webview.platforms.winforms import _is_chromium
-
-            if _is_chromium():
-                gui = "edgechromium"
-            else:
-                util.download_webview2()
+        if _is_chromium():
+            gui = "edgechromium"
+        else:
+            util.download_webview2()
     else:
         gui = "qt"
         os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
