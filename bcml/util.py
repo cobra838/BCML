@@ -592,6 +592,9 @@ DEFAULT_SETTINGS = {
     "store_dir": str(get_data_dir()),
     "export_dir": "",
     "export_dir_nx": "",
+    "export_method": "hard_link",
+    "export_layout": "with_named_folder",
+    "export_layout_nx": "atmosphere",
     "load_reverse": False,
     "site_meta": "",
     "dark_theme": False,
@@ -631,11 +634,20 @@ def get_settings(name: str = "") -> Any:
                         settings[k] = v
                 if settings["store_dir"] == "" or not settings["store_dir"]:
                     settings["store_dir"] = str(get_data_dir())
-                if settings["cemu_dir"] and not settings["no_cemu"]:
+                if "export_method" not in settings:
+                    settings["export_method"] = (
+                        "copy" if settings.get("no_hardlinks") else "hard_link"
+                    )
+                if (
+                    settings.get("export_layout", "with_named_folder") == "with_named_folder"
+                    and settings.get("export_dir")
+                    and Path(settings["export_dir"]).name.lower() == "breathofthewild_bcml"
+                ):
+                    settings["export_dir"] = str(Path(settings["export_dir"]).parent)
+                if settings["cemu_dir"] and not settings["no_cemu"] and not settings["export_dir"]:
                     settings["export_dir"] = str(
                         Path(settings["cemu_dir"])
                         / "graphicPacks"
-                        / "BreathOfTheWild_BCML"
                     )
             setattr(get_settings, "settings", settings)
         if name:

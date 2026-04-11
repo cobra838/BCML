@@ -16,6 +16,9 @@ class Settings extends React.Component {
             store_dir: "",
             export_dir: "",
             export_dir_nx: "",
+            export_method: "hard_link",
+            export_layout: "with_named_folder",
+            export_layout_nx: "atmosphere",
             load_reverse: false,
             site_meta: "",
             no_guess: false,
@@ -94,7 +97,15 @@ class Settings extends React.Component {
         const languages = await pywebview.api.get_user_langs({
             dir: settings.wiiu ? settings.game_dir : settings.game_dir_nx
         });
-        this.setState({ ...settings, languages }, () =>
+        this.setState({
+            ...settings,
+            export_method:
+                settings.export_method ||
+                (settings.no_hardlinks ? "copy" : "hard_link"),
+            export_layout: settings.export_layout || "with_named_folder",
+            export_layout_nx: settings.export_layout_nx || "atmosphere",
+            languages
+        }, () =>
             this.setState({ loaded: true })
         );
     };
@@ -107,6 +118,7 @@ class Settings extends React.Component {
             } else {
                 this.setState({ valid: true }, () => {
                     let { valid, languages, ...settings } = this.state;
+                    settings.no_hardlinks = settings.export_method === "copy";
                     this.props.onSubmit(settings);
                 });
             }
@@ -139,7 +151,7 @@ class Settings extends React.Component {
             for (const key of Object.keys(this.state).filter(
                 k =>
                     k.includes("dir") &&
-                    !["cemu_dir", "store_dir", "export_dir"].includes(k) &&
+                    !["cemu_dir", "store_dir", "export_dir", "export_dir_nx"].includes(k) &&
                     prevState[k] != this.state[k] &&
                     !prevState[k]
             )) {
@@ -188,7 +200,7 @@ class Settings extends React.Component {
                 <Row>
                     <Col>
                         <Form.Group controlId="cemu_dir">
-                            <Form.Label>Cemu Directory</Form.Label>
+                            <Form.Label>EMU Directory</Form.Label>
                             <FolderInput
                                 value={this.state.cemu_dir}
                                 disabled={!this.state.wiiu || this.state.no_cemu}
@@ -201,13 +213,13 @@ class Settings extends React.Component {
                                     <Tooltip>
                                         {this.state.wiiu ? (
                                             <>
-                                                (Optional) The directory where Cemu is
-                                                installed. Note that this <em>must</em>{" "}
-                                                be the folder that directly contains
-                                                "Cemu.exe" and "settings.xml"
+                                                (Optional) The directory where your
+                                                emulator is installed. For Wii U this
+                                                should be the folder that directly
+                                                contains "Cemu.exe" and "settings.xml"
                                             </>
                                         ) : (
-                                            "Not applicable for Switch mode"
+                                            "Currently only used for emulator launching"
                                         )}
                                     </Tooltip>
                                 }
@@ -416,22 +428,18 @@ class Settings extends React.Component {
                         </Form.Group>
                         <Form.Group
                             controlId="export_dir"
-                            className={
-                                (!this.state.wiiu || !this.state.no_cemu) && "d-none"
-                            }>
-                            <Form.Label>Merged Export Directory</Form.Label>
+                            className={!this.state.wiiu && "d-none"}>
+                            <Form.Label>Output Folder</Form.Label>
                             <FolderInput
                                 value={this.state.export_dir}
                                 onChange={this.handleChange}
                                 isValid={true}
                                 overlay={
                                     <Tooltip>
-                                        (Optional) Where to automatically export the
-                                        final merged mod pack.<br />
-                                        <br />
-                                        WARNING: The contents of this folder will be
-                                        deleted. Do not set this to a folder whose
-                                        contents you wish to retain.
+                                        (Optional) Root folder where BCML will export
+                                        the merged Wii U output. BCML will build the
+                                        final layout inside this folder based on Export
+                                        Layout.
                                     </Tooltip>
                                 }
                                 placeholder="Optional"
@@ -440,15 +448,17 @@ class Settings extends React.Component {
                         <Form.Group
                             controlId="export_dir_nx"
                             className={this.state.wiiu && "d-none"}>
-                            <Form.Label>Merged Export Directory</Form.Label>
+                            <Form.Label>Output Folder</Form.Label>
                             <FolderInput
                                 value={this.state.export_dir_nx}
                                 onChange={this.handleChange}
                                 isValid={true}
                                 overlay={
                                     <Tooltip>
-                                        (Optional) Where to automatically export the
-                                        final merged mod pack.
+                                        (Optional) Root folder where BCML will export
+                                        the merged Switch output. BCML will build the
+                                        final layout inside this folder based on Export
+                                        Layout.
                                     </Tooltip>
                                 }
                                 placeholder="Optional"
@@ -552,24 +562,82 @@ class Settings extends React.Component {
                                 />
                             </OverlayTrigger>
                         </Form.Group>
-                        <Form.Group controlId="no_hardlinks">
+                        <Form.Group controlId="export_method">
+                            <Form.Label>Export Method</Form.Label>
                             <OverlayTrigger
                                 overlay={
                                     <Tooltip>
-                                        By default, BCML uses directory junctions or
-                                        symlinks to connect installed mods to their
-                                        merged destination. Use this option to disable
-                                        this if it doesn't work and just copy the
-                                        files instead.
+                                        Choose how BCML writes the merged output.
+                                        Copy is safest for consoles. Hard links are
+                                        implemented with directory junctions on Windows.
+                                        Symlinks are fastest but may require extra
+                                        permissions.
                                     </Tooltip>
                                 }
                                 placement={"left"}>
-                                <Form.Check
-                                    type="checkbox"
-                                    label="Disable links for master mod"
-                                    checked={this.state.no_hardlinks}
+                                <Form.Control
+                                    as="select"
+                                    value={this.state.export_method}
                                     onChange={this.handleChange}
-                                />
+                                >
+                                    <option value="copy">Copy</option>
+                                    <option value="hard_link">Hard links</option>
+                                    <option value="symlink">Symlink</option>
+                                </Form.Control>
+                            </OverlayTrigger>
+                        </Form.Group>
+                        <Form.Group
+                            controlId="export_layout"
+                            className={!this.state.wiiu && "d-none"}>
+                            <Form.Label>Export Layout</Form.Label>
+                            <OverlayTrigger
+                                overlay={
+                                    <Tooltip>
+                                        With Named Folder creates
+                                        BreathOfTheWild_BCML inside the Output Folder.
+                                        Without Named Folder writes content and aoc
+                                        directly inside the Output Folder.
+                                    </Tooltip>
+                                }
+                                placement={"left"}>
+                                <Form.Control
+                                    as="select"
+                                    value={this.state.export_layout}
+                                    onChange={this.handleChange}>
+                                    <option value="with_named_folder">
+                                        With Named Folder
+                                    </option>
+                                    <option value="without_named_folder">
+                                        Without Named Folder
+                                    </option>
+                                </Form.Control>
+                            </OverlayTrigger>
+                        </Form.Group>
+                        <Form.Group
+                            controlId="export_layout_nx"
+                            className={this.state.wiiu && "d-none"}>
+                            <Form.Label>Export Layout</Form.Label>
+                            <OverlayTrigger
+                                overlay={
+                                    <Tooltip>
+                                        Atmosphere Layout exports title ID folders with
+                                        romfs directly inside them. Emulator Mod Layout
+                                        exports title ID folders with a
+                                        BreathOfTheWild_BCML mod folder inside each one.
+                                    </Tooltip>
+                                }
+                                placement={"left"}>
+                                <Form.Control
+                                    as="select"
+                                    value={this.state.export_layout_nx}
+                                    onChange={this.handleChange}>
+                                    <option value="atmosphere">
+                                        Atmosphere Layout
+                                    </option>
+                                    <option value="emulator">
+                                        Emulator Mod Layout
+                                    </option>
+                                </Form.Control>
                             </OverlayTrigger>
                         </Form.Group>
                         <Form.Group controlId="suppress_update">

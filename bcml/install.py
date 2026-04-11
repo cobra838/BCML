@@ -398,12 +398,12 @@ def install_mod(
                             except (ValueError, oead.InvalidDataError, RuntimeError):
                                 out.unlink()
                                 os.link(file, out)
+                                continue
                             try:
                                 link_sarc = oead.Sarc(
                                     util.unyaz_if_needed(file.read_bytes())
                                 )
                             except (ValueError, oead.InvalidDataError, RuntimeError):
-                                del old_sarc
                                 continue
                             new_sarc = oead.SarcWriter.from_sarc(link_sarc)
                             link_files = {f.name for f in link_sarc.get_files()}
@@ -693,7 +693,18 @@ def enable_bcml_gfx():
         entry.appendChild(entrypreset)
         gpack.appendChild(entry)
 
-    create_entry("graphicPacks\\BreathOfTheWild_BCML\\rules.txt")
+    output_root = Path(util.get_settings("export_dir")) if util.get_settings("export_dir") else util.get_cemu_dir() / "graphicPacks"
+    package_root = (
+        output_root / "BreathOfTheWild_BCML"
+        if util.get_settings().get("export_layout", "with_named_folder") == "with_named_folder"
+        else output_root
+    )
+    rules_file = package_root / "rules.txt"
+    try:
+        create_entry(str(rules_file.relative_to(util.get_cemu_dir())).replace("/", "\\"))
+    except ValueError:
+        if rules_file.exists():
+            create_entry(str(rules_file))
 
     if (util.get_cemu_dir() / "graphicPacks" / "bcmlPatches").exists():
         for rules in (util.get_cemu_dir() / "graphicPacks" / "bcmlPatches").rglob(
@@ -750,7 +761,7 @@ def link_master_mod(output: Path = None):
                 "probably because Cemu is on an external USB, eSATA, or "
                 "network drive. You can fix this in one of two ways:\n"
                 "- Make sure Cemu is on an internal drive\n"
-                "- Turn on the 'no hard links' option in BCML's settings "
+                "- Change Export Method to Copy in BCML's settings "
                 "(but be aware that mod merging will take much longer)"
             ) from err
         else:
