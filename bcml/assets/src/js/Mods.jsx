@@ -190,6 +190,7 @@ class Mods extends React.Component {
                         } else {
                             this.props.onError(err);
                         }
+                        throw err;
                     }
                 });
             }
