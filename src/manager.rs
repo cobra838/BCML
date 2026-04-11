@@ -115,7 +115,6 @@ impl<'py, 'set> ModLinker<'py, 'set> {
                         .collect::<Vec<PathBuf>>()
                 })
                 .collect();
-        dbg!(&mod_folders);
         py.allow_threads(|| -> Result<()> {
             mod_folders
                 .into_iter()
