@@ -317,14 +317,15 @@ impl<'py, 'set> ModLinker<'py, 'set> {
 
 #[pyfunction]
 fn link_master_mod(py: Python, output: Option<String>) -> PyResult<()> {
-    if let Some(output) = output
+    let output = output
         .map(PathBuf::from)
         .or_else(|| util::settings().export_dir())
-    {
-        let mut linker = ModLinker::new(py, output);
-        linker
-            .link_internal()
-            .context("Failed to link internal merge")?;
+        .unwrap_or_else(|| util::settings().merged_modpack_dir());
+    let mut linker = ModLinker::new(py, output.clone());
+    linker
+        .link_internal()
+        .context("Failed to link internal merge")?;
+    if output != linker.merged {
         linker
             .link_external()
             .context("Failed to export merged mods")?;
