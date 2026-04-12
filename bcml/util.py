@@ -1420,25 +1420,6 @@ def create_bcml_graphicpack_if_needed():
         )
 
 
-def create_shortcuts(desktop: bool, start_menu: bool):
-    if desktop:
-        rsext.manager.create_shortcut(
-            str(get_python_exe(True)),
-            str(get_exec_dir() / "data" / "bcml.ico"),
-            str(Path(r"~\Desktop\BCML.lnk").expanduser()),
-        )
-    if start_menu:
-        rsext.manager.create_shortcut(
-            str(get_python_exe(True)),
-            str(get_exec_dir() / "data" / "bcml.ico"),
-            str(
-                Path(
-                    r"~\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\BCML.lnk"
-                ).expanduser()
-            ),
-        )
-
-
 def download_webview2():
     from bcml import native_msg
 

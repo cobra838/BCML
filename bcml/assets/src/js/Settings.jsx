@@ -192,16 +192,6 @@ class Settings extends React.Component {
         });
     };
 
-    makeShortcut = async desktop => {
-        try {
-            this.props.onProgress("Creating shortcut...");
-            await pywebview.api.make_shortcut({ desktop });
-            this.props.onDone();
-        } catch (error) {
-            this.props.onError(error);
-        }
-    };
-
     autoFillExportDir = async () => {
         try {
             const exportDir = await pywebview.api.guess_export_dir({
@@ -513,21 +503,6 @@ class Settings extends React.Component {
                                 </Button>
                             </div>
                         </Form.Group>
-                        {!window.navigator.userAgent.includes("inux") && (
-                            <>
-                                <h5>Create BCML Shortcuts</h5>
-                                <Button
-                                    variant="success"
-                                    onClick={() => this.makeShortcut(true)}>
-                                    Desktop
-                                </Button>{" "}
-                                <Button
-                                    variant="success"
-                                    onClick={() => this.makeShortcut(false)}>
-                                    Start Menu
-                                </Button>
-                            </>
-                        )}
                     </Col>
                     <Col>
                         <br />

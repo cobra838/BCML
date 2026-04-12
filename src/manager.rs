@@ -5,8 +5,6 @@ use crate::{
 use anyhow::Context;
 use fs_err as fs;
 use join_str::jstr;
-#[cfg(windows)]
-use mslnk::ShellLink;
 use parking_lot::RwLockReadGuard;
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -22,26 +20,9 @@ use std::{thread, time::Duration};
 
 pub fn manager_mod(py: Python, parent: &PyModule) -> PyResult<()> {
     let manager_module = PyModule::new(py, "manager")?;
-    #[cfg(windows)]
-    manager_module.add_wrapped(wrap_pyfunction!(create_shortcut))?;
     manager_module.add_wrapped(wrap_pyfunction!(link_master_mod))?;
     parent.add_submodule(manager_module)?;
     Ok(())
-}
-
-#[cfg(windows)]
-#[pyfunction]
-fn create_shortcut(_py: Python, py_path: String, ico_path: String, dest: String) -> PyResult<()> {
-    let make = || -> anyhow::Result<()> {
-        let mut link = ShellLink::new(&py_path)?;
-        link.set_arguments(Some("-m bcml".into()));
-        link.set_name(Some("BCML".into()));
-        link.set_icon_location(Some(ico_path));
-        fs::create_dir_all(std::path::Path::new(&dest).parent().unwrap())?;
-        link.create_lnk(&dest)?;
-        Ok(())
-    };
-    Ok(make()?)
 }
 
 static RULES_TXT: &str = r#"[Definition]
