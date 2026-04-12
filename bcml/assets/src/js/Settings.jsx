@@ -152,15 +152,17 @@ class Settings extends React.Component {
                 }
             }
             if (
+                prevState.wiiu != this.state.wiiu ||
                 prevState.game_dir != this.state.game_dir ||
                 prevState.game_dir_nx != this.state.game_dir_nx
             ) {
                 const languages = await pywebview.api.get_user_langs({
                     dir: this.state.wiiu ? this.state.game_dir : this.state.game_dir_nx
                 });
-                this.setState({
-                    languages
-                });
+                this.setState(state => ({
+                    languages,
+                    lang: languages.includes(state.lang) ? state.lang : ""
+                }));
             }
             for (const key of Object.keys(this.state).filter(
                 k =>
