@@ -847,9 +847,7 @@ class DungeonStaticMerger(mergers.Merger):
 
     def get_all_diffs(self):
         diffs = []
-        for mod in [
-            mod for mod in util.get_installed_mods() if self.is_mod_logged(mod)
-        ]:
+        for mod in util.get_installed_mods():
             diffs.append(self.get_mod_diff(mod))
         return diffs
 
