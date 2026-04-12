@@ -147,7 +147,7 @@ class PackMerger(mergers.Merger):
                     (mod.path / "logs" / self._log_name).read_text(encoding="utf-8")
                 ).items()
             }
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 diffs |= {
                     Path(path.replace("\\", "/")).as_posix()

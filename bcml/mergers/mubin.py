@@ -582,7 +582,7 @@ class MapMerger(mergers.Merger):
             else:
                 diff = oead.byml.from_text(diff_text)
             diffs.append(diff)
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 diff_text = (opt / "logs" / self._log_name).read_text(encoding="utf-8")
                 if not ("Rails" in diff_text and "Objs" in diff_text):
@@ -834,7 +834,7 @@ class DungeonStaticMerger(mergers.Merger):
                 ),
                 overwrite_lists=True,
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 util.dict_merge(
                     diffs,

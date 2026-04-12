@@ -180,8 +180,8 @@ class Mods extends React.Component {
         let tasks = [];
         let verb = action.replace(/^\w/, c => c.toUpperCase());
         if (verb.endsWith("e")) verb = verb.substring(0, verb.length - 1);
-        if (action == "reinstall") {
-            this.props.onReinstall(this.state.selectedMods[0]);
+        if (action == "options") {
+            this.props.onChangeOptions(this.state.selectedMods[0]);
             return;
         }
         for (const mod of this.state.selectedMods) {
@@ -636,7 +636,7 @@ class Mods extends React.Component {
                             mod={this.state.selectedMods[0]}
                             multi={this.state.selectedMods.length > 1}
                             onAction={this.handleAction}
-                            onReinstall={this.props.onReinstall}
+                            onChangeOptions={this.props.onChangeOptions}
                         />
                     </div>
                 </div>

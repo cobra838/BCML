@@ -8,11 +8,12 @@ use join_str::jstr;
 use parking_lot::RwLockReadGuard;
 use pyo3::prelude::*;
 use rayon::prelude::*;
+use serde::Deserialize;
 #[cfg(windows)]
 use remove_dir_all::remove_dir_all;
 #[cfg(not(windows))]
 use std::fs::remove_dir_all;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(windows)]
 use std::{fs as stdfs, io::ErrorKind};
 #[cfg(windows)]
@@ -35,6 +36,12 @@ default = true
 fsPriority = 9999
 "#;
 
+#[derive(Debug, Default, Deserialize)]
+struct StoredModOptions {
+    #[serde(default)]
+    selects: Vec<String>,
+}
+
 struct ModLinker<'py, 'set> {
     merged: PathBuf,
     output: Option<PathBuf>,
@@ -45,6 +52,26 @@ struct ModLinker<'py, 'set> {
 }
 
 impl<'py, 'set> ModLinker<'py, 'set> {
+    fn selected_option_dirs(mod_dir: &Path) -> Vec<PathBuf> {
+        let options_dir = mod_dir.join("options");
+        if !options_dir.is_dir() {
+            return Vec::new();
+        }
+        let options_path = mod_dir.join("options.json");
+        let stored: StoredModOptions = options_path
+            .is_file()
+            .then(|| fs::read_to_string(&options_path).ok())
+            .flatten()
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default();
+        stored
+            .selects
+            .into_iter()
+            .map(|folder| options_dir.join(folder))
+            .filter(|folder| folder.is_dir())
+            .collect()
+    }
+
     fn new(py: Python<'py>, output: Option<PathBuf>) -> Self {
         let settings = util::settings();
         let merged = settings.merged_modpack_dir();
@@ -85,14 +112,8 @@ impl<'py, 'set> ModLinker<'py, 'set> {
                 .collect::<std::collections::BTreeSet<PathBuf>>()
                 .into_iter()
                 .flat_map(|p| {
-                    let glob_str = p.join("options/*").display().to_string();
-                    std::iter::once(p)
-                        .chain(
-                            glob::glob(&glob_str)
-                                .expect("Bad glob?!?!?")
-                                .filter_map(|p| p.ok())
-                                .filter(|p| p.is_dir()),
-                        )
+                    std::iter::once(p.clone())
+                        .chain(Self::selected_option_dirs(&p))
                         .collect::<Vec<PathBuf>>()
                 })
                 .collect();

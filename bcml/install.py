@@ -286,6 +286,16 @@ def install_mod(
 ):
     if not insert_priority:
         insert_priority = get_next_priority()
+    if not options:
+        options = {"disable": [], "options": {}}
+    if "disable" not in options:
+        options["disable"] = []
+    if "options" not in options:
+        options["options"] = {}
+    if selects is not None:
+        options["selects"] = selects
+    elif "selects" not in options:
+        options["selects"] = []
 
     try:
         if isinstance(mod, str):
@@ -373,52 +383,6 @@ def install_mod(
         except NameError:
             name = "your mod, the name of which could not be detected"
         raise util.InstallError(err, name) from err
-
-    if selects is not None:
-        for opt_dir in {d for d in (tmp_dir / "options").glob("*") if d.is_dir()}:
-            if opt_dir.name not in selects:
-                shutil.rmtree(opt_dir, ignore_errors=True)
-            else:
-                file: Path
-                for file in {
-                    f
-                    for f in opt_dir.rglob("**/*")
-                    if ("logs" not in f.parts and f.is_file())
-                }:
-                    out = tmp_dir / file.relative_to(opt_dir)
-                    out.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        os.link(file, out)
-                    except FileExistsError:
-                        if file.suffix in util.SARC_EXTS:
-                            try:
-                                old_sarc = oead.Sarc(
-                                    util.unyaz_if_needed(out.read_bytes())
-                                )
-                            except (ValueError, oead.InvalidDataError, RuntimeError):
-                                out.unlink()
-                                os.link(file, out)
-                                continue
-                            try:
-                                link_sarc = oead.Sarc(
-                                    util.unyaz_if_needed(file.read_bytes())
-                                )
-                            except (ValueError, oead.InvalidDataError, RuntimeError):
-                                continue
-                            new_sarc = oead.SarcWriter.from_sarc(link_sarc)
-                            link_files = {f.name for f in link_sarc.get_files()}
-                            for sarc_file in old_sarc.get_files():
-                                if sarc_file.name not in link_files:
-                                    new_sarc.files[sarc_file.name] = bytes(
-                                        sarc_file.data
-                                    )
-                            del old_sarc
-                            del link_sarc
-                            out.write_bytes(new_sarc.write()[1])
-                            del new_sarc
-                        else:
-                            out.unlink()
-                            os.link(file, out)
 
     rstb_path = (
         tmp_dir

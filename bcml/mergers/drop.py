@@ -196,7 +196,7 @@ class DropMerger(mergers.Merger):
                 diff,
                 data,
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 data = json.loads((opt / "logs" / self._log_name).read_text("utf-8"))
                 rem_underride(data)

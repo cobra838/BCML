@@ -199,8 +199,16 @@ class Api:
     def get_existing_options(self, params):
         mod = BcmlMod.from_json(params["mod"])
         if (mod.path / "options.json").exists():
-            return json.loads((mod.path / "options.json").read_text())
-        return {"options": {}, "disable": []}
+            options = json.loads((mod.path / "options.json").read_text())
+        else:
+            options = {"options": {}, "disable": []}
+        if "disable" not in options:
+            options["disable"] = []
+        if "options" not in options:
+            options["options"] = {}
+        if "selects" not in options:
+            options["selects"] = []
+        return options
 
     def guess_export_dir(self, params):
         return str(
@@ -300,6 +308,8 @@ class Api:
             img = base64.b64encode(mod.get_preview().read_bytes()).decode("utf8")
         except:  # pylint: disable=bare-except
             pass
+        mod_options = mod._info.get("options") or {}
+        has_options = bool(mod_options.get("multi") or mod_options.get("single"))
         return {
             "changes": [
                 m.NAME.upper() for m in mergers.get_mergers() if m().is_mod_logged(mod)
@@ -309,6 +319,7 @@ class Api:
             "processed": (mod.path / ".processed").exists(),
             "image": img,
             "url": mod.url,
+            "hasOptions": has_options,
         }
 
     def get_setup(self):
@@ -459,27 +470,16 @@ class Api:
 
     @win_or_lose
     @install.refresher
-    def reinstall_mod(self, params):
+    def change_mod_options(self, params):
         mod = BcmlMod.from_json(params["mod"])
-        if (mod.path / "options.json").exists():
-            options = json.loads((mod.path / "options.json").read_text())
-        else:
-            options = {"options": {}, "disable": []}
+        options = self.get_existing_options(params)
         if "options" in params and params["options"]:
             options = params["options"]
-        source = Path(mkdtemp()) / mod.path.name
-        copytree(mod.path, source)
-        rmtree(mod.path)
-        with util.start_pool() as pool:
-            install.install_mod(
-                source,
-                insert_priority=mod.priority,
-                options=options,
-                selects=params.get("selects"),
-                pool=pool,
-                updated=True,
-            )
-            install.refresh_merges()
+        options["selects"] = params.get("selects", [])
+        (mod.path / "options.json").write_text(
+            json.dumps(options, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        install.refresh_merges()
 
     @win_or_lose
     def reprocess(self, params):

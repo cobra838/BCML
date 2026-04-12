@@ -60,7 +60,7 @@ class ActorInfoMerger(mergers.Merger):
                 ),
                 overwrite_lists=True,
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 util.dict_merge(
                     diffs,

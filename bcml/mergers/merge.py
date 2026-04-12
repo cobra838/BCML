@@ -258,7 +258,7 @@ class DeepMerger(mergers.Merger):
         diff = None
         if self.is_mod_logged(mod):
             diff = self.read_diff(mod.path / "logs" / self._log_name)
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 if not diff:
                     diff = ParameterIO()

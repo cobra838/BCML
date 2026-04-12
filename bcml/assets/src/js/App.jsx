@@ -222,51 +222,43 @@ class App extends React.Component {
         );
     };
 
-    handleReinstall = async mod => {
+    handleChangeOptions = async mod => {
         const options = mod?.path?.length
             ? await pywebview.api.get_existing_options({ mod })
             : {
                   disable: [],
-                  options: {}
+                  options: {},
+                  selects: []
               };
-        if (!this.selects) {
-            await new Promise(resolve =>
-                this.setState(
-                    {
-                        progressTitle: "One Sec",
-                        progressStatus: "Processing",
-                        showProgress: true
-                    },
-                    () => resolve()
-                )
-            );
-            this.selects = await pywebview.api.check_mod_options({ mods: [mod.path] });
-            await new Promise(resolve =>
-                this.setState(
-                    {
-                        showProgress: true
-                    },
-                    () => resolve()
-                )
-            );
-        }
-        const num_selects = Object.keys(this.selects).length;
-        if (num_selects > 0 && num_selects > (this.state.selects?.length || 0)) {
-            this.installArgs = { mode: "reinstall", mod, options };
-            this.setState({
-                selectPath: Object.keys(this.selects)[0],
-                selectMod: this.selects[Object.keys(this.selects)[0]]
-            });
+        this.selects = await pywebview.api.check_mod_options({ mods: [mod.path] });
+        if (!this.selects[mod.path]) {
             return;
         }
+        this.installArgs = { mode: "change-options", mod, options };
+        this.setState(
+            {
+                selectPath: mod.path,
+                selectMod: this.selects[mod.path],
+                selects: {
+                    [mod.path]: options.selects || []
+                }
+            }
+        );
+    };
+
+    applyChangedOptions = (mod, options) => {
         this.setState(
             {
                 showProgress: true,
-                progressTitle: "Reinstalling Mod"
+                progressTitle: "Updating Mod Options"
             },
             () => {
                 pywebview.api
-                    .reinstall_mod({ mod, options, selects: this.state.selects })
+                    .change_mod_options({
+                        mod,
+                        options,
+                        selects: this.state.selects?.[mod.path] || []
+                    })
                     .then(res => {
                         if (!res.success) {
                             throw res.error;
@@ -509,7 +501,7 @@ class App extends React.Component {
                                 onConfirm={this.confirm}
                                 onChange={mods => this.setState({ mods })}
                                 onInstall={this.handleInstall}
-                                onReinstall={this.handleReinstall}
+                                onChangeOptions={this.handleChangeOptions}
                                 onError={this.showError}
                                 onProgress={this.setProgress}
                                 onDone={() =>
@@ -619,6 +611,7 @@ class App extends React.Component {
                     show={this.state.selectMod != null}
                     path={this.state.selectPath}
                     mod={this.state.selectMod}
+                    selected={this.state.selects?.[this.state.selectPath] || null}
                     onClose={() => {
                         this.setState({
                             selectMod: null,
@@ -642,8 +635,11 @@ class App extends React.Component {
                                 }
                             },
                             () => {
-                                if (this.installArgs.mode == "reinstall") {
-                                    this.handleReinstall(this.installArgs.mod);
+                                if (this.installArgs.mode == "change-options") {
+                                    this.applyChangedOptions(
+                                        this.installArgs.mod,
+                                        this.installArgs.options
+                                    );
                                 } else {
                                     this.handleInstall(
                                         this.installArgs.mods,

@@ -14,6 +14,7 @@ class ModInfo extends React.Component {
             processed: false,
             url: "",
             changes: [],
+            hasOptions: false,
             loading: false
         };
         this.modInfos = {};
@@ -40,7 +41,8 @@ class ModInfo extends React.Component {
                 description: "",
                 changes: [],
                 url: "",
-                processed: false
+                processed: false,
+                hasOptions: false
             });
         } else {
             const mod = JSON.stringify(this.props.mod);
@@ -139,15 +141,17 @@ class ModInfo extends React.Component {
                             onClick={() => this.props.onAction("update")}>
                             <i className="material-icons">update</i> <span>Update</span>
                         </Button>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            title="Reinstall"
-                            disabled={!this.props.mod || this.props.multi}
-                            onClick={() => this.props.onAction("reinstall")}>
-                            <i className="material-icons">autorenew</i>{" "}
-                            <span>Reinstall</span>
-                        </Button>
+                        {this.state.hasOptions && (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                title="Change Options"
+                                disabled={!this.props.mod || this.props.multi}
+                                onClick={() => this.props.onAction("options")}>
+                                <i className="material-icons">tune</i>{" "}
+                                <span>Options</span>
+                            </Button>
+                        )}
                         {this.state.processed && !this.context.settings?.strip_gfx && (
                             <Button
                                 variant="secondary"

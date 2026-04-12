@@ -374,7 +374,7 @@ class ShopMerger(mergers.Merger):
             diff = ParameterIO.from_binary(
                 (mod.path / "logs" / self._log_name).read_bytes()
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 if not diff:
                     diff = ParameterIO()

@@ -183,7 +183,7 @@ class GameDataMerger(mergers.Merger):
                 ),
                 overwrite_lists=True,
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 util.dict_merge(
                     diffs,
@@ -369,7 +369,7 @@ class SaveDataMerger(mergers.Merger):
                     (mod.path / "logs" / self._log_name).read_text(encoding="utf-8")
                 )
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 diffs.append(
                     oead.byml.from_text(

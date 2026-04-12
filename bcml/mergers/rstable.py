@@ -303,7 +303,7 @@ class RstbMerger(mergers.Merger):
             diff.update(
                 json.loads((mod.path / "logs" / self._log_name).read_text("utf-8"))
             )
-        for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
+        for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 diff.update(
                     json.loads((opt / "logs" / self._log_name).read_text("utf-8"))

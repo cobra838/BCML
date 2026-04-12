@@ -12,15 +12,42 @@ class SelectsDialog extends React.Component {
         this.handleChange = this.handleChange.bind(this);
     }
 
+    getInitialFolders = props => {
+        if (Array.isArray(props.selected)) {
+            return [...props.selected];
+        }
+        const folders = [];
+        if (props.mod?.options?.multi) {
+            folders.push(
+                ...props.mod.options.multi
+                    .map(m => (m.default ? m.folder : null))
+                    .filter(Boolean)
+            );
+        }
+        if (props.mod?.options?.single) {
+            folders.push(
+                ...props.mod.options.single
+                    .map(group => {
+                        const option = group.options.find(opt => opt.default);
+                        return option ? option.folder : null;
+                    })
+                    .filter(Boolean)
+            );
+        }
+        return folders;
+    };
+
     componentDidUpdate(prevProps) {
         if (
             this.props.mod &&
-            (!prevProps.mod || prevProps.mod.options != this.props.mod.options)
+            (!prevProps.mod ||
+                prevProps.mod.options != this.props.mod.options ||
+                prevProps.selected != this.props.selected ||
+                (!prevProps.show && this.props.show))
         ) {
             this.setState({
-                folders: this.props.mod.options.multi
-                    .map(m => (m.default ? m.folder : null))
-                    .filter(m => m)
+                folders: this.getInitialFolders(this.props),
+                error: null
             });
         }
     }
@@ -153,6 +180,9 @@ class SelectsDialog extends React.Component {
                                                             name={s.name}
                                                             label={opt.name}
                                                             value={opt.folder}
+                                                            checked={this.state.folders.includes(
+                                                                opt.folder
+                                                            )}
                                                             onChange={this.handleChange}
                                                         />
                                                     </OverlayTrigger>
