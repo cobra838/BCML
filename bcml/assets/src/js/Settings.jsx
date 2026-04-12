@@ -118,7 +118,7 @@ class Settings extends React.Component {
                 this.setState({ valid: false }, () => this.props.onFail());
             } else {
                 this.setState({ valid: true }, () => {
-                    let { valid, languages, ...settings } = this.state;
+                    let { valid, loaded, languages, ...settings } = this.state;
                     settings.no_hardlinks = settings.export_method === "copy";
                     this.props.onSubmit(settings);
                 });
@@ -184,6 +184,23 @@ class Settings extends React.Component {
             this.props.onProgress("Creating shortcut...");
             await pywebview.api.make_shortcut({ desktop });
             this.props.onDone();
+        } catch (error) {
+            this.props.onError(error);
+        }
+    };
+
+    autoFillExportDir = async () => {
+        try {
+            const exportDir = await pywebview.api.guess_export_dir({
+                emu_path: this.state.cemu_dir,
+                wiiu: this.state.wiiu,
+                export_layout_nx: this.state.export_layout_nx
+            });
+            this.setState(
+                this.state.wiiu
+                    ? { export_dir: exportDir }
+                    : { export_dir_nx: exportDir }
+            );
         } catch (error) {
             this.props.onError(error);
         }
@@ -450,6 +467,15 @@ class Settings extends React.Component {
                                 }
                                 placeholder="Optional"
                             />
+                            <div className="mt-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline-secondary"
+                                    disabled={!this.state.cemu_dir}
+                                    onClick={this.autoFillExportDir}>
+                                    Use EMU Executable
+                                </Button>
+                            </div>
                         </Form.Group>
                         <Form.Group
                             controlId="export_dir_nx"
@@ -469,6 +495,15 @@ class Settings extends React.Component {
                                 }
                                 placeholder="Optional"
                             />
+                            <div className="mt-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline-secondary"
+                                    disabled={!this.state.cemu_dir}
+                                    onClick={this.autoFillExportDir}>
+                                    Use EMU Executable
+                                </Button>
+                            </div>
                         </Form.Group>
                         {!window.navigator.userAgent.includes("inux") && (
                             <>

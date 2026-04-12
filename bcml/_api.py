@@ -209,6 +209,15 @@ class Api:
     def get_settings(self, params=None):
         return util.get_settings()
 
+    def guess_export_dir(self, params):
+        return str(
+            util.guess_export_dir_from_emu(
+                params["emu_path"],
+                params["wiiu"],
+                params.get("export_layout_nx", "atmosphere"),
+            )
+        )
+
     @win_or_lose
     def make_shortcut(self, params):
         util.create_shortcuts(params["desktop"], not params["desktop"])

@@ -689,6 +689,50 @@ def get_emu_executable() -> Path:
     raise FileNotFoundError("The emulator executable has moved or not been saved yet.")
 
 
+def get_emu_base_dir(emu_path: Union[str, Path]) -> Path:
+    path = Path(emu_path)
+    if path.is_dir():
+        return path
+    if path.is_file():
+        return path.parent
+    if path.suffix:
+        return path.parent
+    return path
+def guess_export_dir_from_emu(
+    emu_path: Union[str, Path], wiiu: bool, export_layout_nx: str = "atmosphere"
+) -> Path:
+    if not emu_path:
+        raise FileNotFoundError("No emulator executable has been set.")
+    base_dir = get_emu_base_dir(emu_path)
+    if wiiu:
+        return base_dir / "graphicPacks"
+
+    emu_key = Path(emu_path).name.lower()
+    appdata = Path(os.path.expandvars("%APPDATA%"))
+
+    def nx_layout_path(root: Path, family: str) -> Path:
+        if family == "ryujinx":
+            if export_layout_nx == "emulator":
+                return root / "mods" / "contents"
+            return root / "sdcard" / "atmosphere" / "contents"
+        if export_layout_nx == "emulator":
+            return root / "user" / "load"
+        return root / "sdmc" / "atmosphere" / "contents"
+    if "ryujinx" in emu_key:
+        portable_root = base_dir / "portable"
+        if portable_root.exists():
+            return nx_layout_path(portable_root if export_layout_nx == "emulator" else base_dir, "ryujinx")
+        return nx_layout_path(appdata / "Ryujinx", "ryujinx")
+    for family in ("yuzu", "eden", "citron"):
+        if family in emu_key:
+            if (base_dir / "user").exists():
+                return nx_layout_path(base_dir, family)
+            return nx_layout_path(appdata / family, family)
+    raise FileNotFoundError(
+        "BCML could not determine the default Output Folder for this emulator."
+    )
+
+
 def get_cemu_dir() -> Path:
     return get_emu_executable().parent
 
