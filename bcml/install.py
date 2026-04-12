@@ -659,7 +659,7 @@ def restore_backup(backup: Union[str, Path]):
 
 
 def enable_bcml_gfx():
-    if util.get_settings("no_cemu"):
+    if util.get_settings("no_cemu") or not util.get_settings("wiiu"):
         return
 
     settings = util.parse_cemu_settings()
@@ -720,7 +720,7 @@ def enable_bcml_gfx():
 
 
 def disable_bcml_gfx():
-    if not util.get_settings("no_cemu"):
+    if not util.get_settings("no_cemu") and util.get_settings("wiiu"):
         settings = util.parse_cemu_settings()
         try:
             gpack = settings.getElementsByTagName("GraphicPack")[0]
