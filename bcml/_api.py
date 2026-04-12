@@ -244,10 +244,16 @@ class Api:
             return {"exists": False, "message": "No old settings found."}
 
     def get_old_mods(self):
+        if not util.get_settings("wiiu") or util.get_settings("no_cemu"):
+            return 0
+        try:
+            cemu_dir = util.get_cemu_dir()
+        except FileNotFoundError:
+            return 0
         return len(
             {
                 d
-                for d in (util.get_cemu_dir() / "graphicPacks" / "BCML").glob("*")
+                for d in (cemu_dir / "graphicPacks" / "BCML").glob("*")
                 if d.is_dir()
             }
         )
