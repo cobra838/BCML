@@ -27,11 +27,9 @@ class Settings extends React.Component {
             wiiu: true,
             no_hardlinks: false,
             force_7z: false,
-            suppress_update: false,
             valid: false,
             loaded: false,
             nsfw: false,
-            changelog: true,
             strip_gfx: false,
             auto_gb: true,
             show_gb: true,
@@ -687,41 +685,6 @@ class Settings extends React.Component {
                                         Atmosphere Layout
                                     </option>
                                 </Form.Control>
-                            </OverlayTrigger>
-                        </Form.Group>
-                        <Form.Group controlId="suppress_update">
-                            <OverlayTrigger
-                                overlay={
-                                    <Tooltip>
-                                        By default, BCML will notify you when it detects
-                                        an updated version is available. Check this to
-                                        turn that off.
-                                    </Tooltip>
-                                }
-                                placement={"left"}>
-                                <Form.Check
-                                    type="checkbox"
-                                    label="Disable BCML update notification"
-                                    checked={this.state.suppress_update}
-                                    onChange={this.handleChange}
-                                />
-                            </OverlayTrigger>
-                        </Form.Group>
-                        <Form.Group controlId="changelog">
-                            <OverlayTrigger
-                                overlay={
-                                    <Tooltip>
-                                        If checked, BCML will show a changelog popup
-                                        after updating to a new version.
-                                    </Tooltip>
-                                }
-                                placement={"left"}>
-                                <Form.Check
-                                    type="checkbox"
-                                    label="Show changelog after update"
-                                    checked={this.state.changelog}
-                                    onChange={this.handleChange}
-                                />
                             </OverlayTrigger>
                         </Form.Group>
                         {window.navigator.platform.includes("inux") && (

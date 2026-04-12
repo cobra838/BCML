@@ -9,11 +9,10 @@ from math import ceil
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from packaging.version import Version
 from platform import system
 from subprocess import run, PIPE, Popen
 from shutil import copytree, rmtree, copyfile
-from tempfile import NamedTemporaryFile, mkdtemp
+from tempfile import mkdtemp
 from time import sleep
 from threading import Thread
 from typing import Dict, List, Optional
@@ -22,7 +21,7 @@ from xml.dom import minidom
 import requests
 import webview
 
-from bcml import DEBUG, install, dev, locks, mergers, upgrade, util
+from bcml import install, dev, locks, mergers, upgrade, util
 from bcml.util import BcmlMod, LOG, SYSTEM, get_7z_path
 from bcml.__version__ import USER_VERSION, VERSION
 
@@ -65,19 +64,7 @@ class Api:
         self.tmp_files = []
 
     def get_ver(self, params=None):
-        updated = Version(util.get_settings("last_version")) < Version(VERSION)
-        res = {
-            "version": VERSION,
-            "update": (
-                Version(util.get_latest_bcml()) > Version(VERSION)
-                and not util.get_settings("suppress_update")
-            ),
-            "showChangelog": updated and util.get_settings("changelog"),
-        }
-        if updated:
-            util.get_settings()["last_version"] = VERSION
-            util.save_settings()
-        return res
+        return {"version": VERSION}
 
     @win_or_lose
     def sanity_check(self, kwargs=None):
@@ -849,46 +836,6 @@ class Api:
     def open_help(self):
         help_thread = Thread(target=help_window, args=(self.host,))
         help_thread.start()
-
-    @win_or_lose
-    def update_bcml(self):
-        exe = str(util.get_python_exe(False))
-        args = [
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--no-warn-script-location",
-            "--upgrade",
-            "bcml",
-        ]
-        if DEBUG:
-            args.insert(-2, "--pre")
-        if SYSTEM == "Windows":
-            with NamedTemporaryFile("w", suffix=".bat", delete=False) as updater:
-                updater.write(
-                    "@echo off\n"
-                    'taskkill /fi "WINDOWTITLE eq BOTW Cross-Platform Mod Loader"\n'
-                    f"\"{exe}\" {' '.join(args)}\n"
-                    "echo Finished updating, will launch BCML in a moment!\n"
-                    "timeout 2 >nul 2>&1\n"
-                    f'start "" "{str(util.get_python_exe(True))}" -m bcml\n'
-                )
-                file = updater.name
-            os.system(f"timeout 2 >nul 2>&1 && start cmd /c {file}")
-        else:
-            with NamedTemporaryFile("w", suffix=".sh", delete=False) as updater:
-                updater.write(
-                    "#!/usr/bin/bash\n"
-                    "sleep 2\n"
-                    f"\"{exe}\" {' '.join(args)}\n"
-                    "echo Finished updating, will launch BCML in a moment!\n"
-                    f"{exe} -m bcml"
-                )
-                file = updater.name
-            Popen(["/bin/sh", file], start_new_session=True)
-        for win in webview.windows:
-            win.destroy()
 
     def restart(self):
         opener = Thread(target=start_new_instance)

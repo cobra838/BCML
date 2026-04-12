@@ -605,10 +605,7 @@ DEFAULT_SETTINGS = {
     "wiiu": True,
     "no_hardlinks": False,
     "force_7z": False,
-    "suppress_update": False,
     "nsfw": False,
-    "last_version": VERSION,
-    "changelog": True,
     "strip_gfx": False,
     "auto_gb": True,
     "show_gb": False,
@@ -1570,25 +1567,6 @@ def get_open_port():
     port = s.getsockname()[1]
     s.close()
     return port
-
-
-@lru_cache(1)
-def get_latest_bcml() -> str:
-    try:
-        res = requests.get("https://pypi.org/rss/project/bcml/releases.xml")
-        doc = minidom.parseString(res.text)
-        versions = sorted(
-            (
-                item.getElementsByTagName("title")[0].childNodes[0].data
-                for item in doc.getElementsByTagName("item")
-            ),
-            reverse=True,
-        )
-        if DEBUG:
-            return versions[0]
-        return next(v for v in versions if "a" not in v and "b" not in v)
-    except:  # pylint: disable=bare-except
-        return "0.0.0"
 
 
 class RulesParser(ConfigParser):
