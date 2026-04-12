@@ -27,8 +27,9 @@ const TABS = ["mod-list", "dev-tools", "settings"];
 class App extends React.Component {
     constructor() {
         super();
+        const firstStart = window.location.toString().includes("firststart");
         this.state = {
-            tab: null,
+            tab: firstStart ? "settings" : "mod-list",
             mods: [],
             modsLoaded: false,
             selects: null,
@@ -50,7 +51,6 @@ class App extends React.Component {
             confirmText: "",
             confirmCallback: () => {},
             showAbout: false,
-            firstRun: false,
             update: false,
             changelog: true,
             showChangelog: false,
@@ -62,19 +62,10 @@ class App extends React.Component {
         window.addEventListener("pywebviewready", () => {
             setTimeout(async () => {
                 let settings = await pywebview.api.get_settings();
-                let setup = await pywebview.api.get_setup();
-                this.setState(
-                    {
-                        settings,
-                        settingsLoaded: true,
-                        firstRun: setup.firstRun,
-                        tab: setup.firstRun ? "settings" : "mod-list"
-                    },
-                    async () => {
-                        let res = await pywebview.api.get_ver();
-                        this.setState({ ...res });
-                    }
-                );
+                this.setState({ settings }, async () => {
+                    let res = await pywebview.api.get_ver();
+                    this.setState({ ...res });
+                });
             }, 500);
             setTimeout(() => {
                 this.refreshMods();
@@ -94,6 +85,9 @@ class App extends React.Component {
     };
 
     componentDidMount = () => {
+        if (window.location.toString().includes("firststart")) {
+            window.history.replaceState({}, "", "/index.html");
+        }
         window.onMsg = msg => {
             this.setState({ progressStatus: msg });
         };

@@ -131,7 +131,11 @@ def main(debug: bool = False):
         ) + "?autoplay=1"
         width, height = 640, 360
     else:
-        url = f"{host}/index.html"
+        url = (
+            f"{host}/index.html?firststart=1"
+            if util.is_first_run()
+            else f"{host}/index.html"
+        )
         width, height = 907, 680
 
     api.window = webview.create_window(

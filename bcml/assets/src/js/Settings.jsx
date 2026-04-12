@@ -38,6 +38,7 @@ class Settings extends React.Component {
             languages: [...Array.from(Object.keys(LANGUAGE_MAP))]
         };
         this.formRef = React.createRef();
+        this.loadSettings = this.loadSettings.bind(this);
     }
 
     checkValid = async () => {
@@ -93,7 +94,7 @@ class Settings extends React.Component {
         );
     };
 
-    componentDidMount = async () => {
+    loadSettings = async () => {
         const settings = await pywebview.api.get_settings();
         const languages = await pywebview.api.get_user_langs({
             dir: settings.wiiu ? settings.game_dir : settings.game_dir_nx
@@ -110,6 +111,18 @@ class Settings extends React.Component {
             this.setState({ loaded: true })
         );
     };
+
+    componentDidMount = async () => {
+        if (window.pywebview?.api) {
+            this.loadSettings();
+        } else {
+            window.addEventListener("pywebviewready", this.loadSettings, { once: true });
+        }
+    };
+
+    componentWillUnmount() {
+        window.removeEventListener("pywebviewready", this.loadSettings);
+    }
 
     async componentDidUpdate(prevProps, prevState) {
         if (!prevState.loaded) return;

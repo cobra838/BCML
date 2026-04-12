@@ -12,26 +12,40 @@ class FolderInput extends React.Component {
         this.idRef = React.createRef();
         this.folderPick = this.folderPick.bind(this);
         this.handleChange = this.handleChange.bind(this);
+        this.initialize = this.initialize.bind(this);
+        this.updateValidity = this.updateValidity.bind(this);
+    }
+
+    async initialize() {
+        this.id = this.idRef.current.id;
+        this.setState({ value: this.props.value }, this.updateValidity);
     }
 
     async componentDidMount() {
-        const valid = pywebview.api
+        if (window.pywebview?.api) {
+            this.initialize();
+        } else {
+            window.addEventListener("pywebviewready", this.initialize, { once: true });
+        }
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener("pywebviewready", this.initialize);
+    }
+
+    updateValidity() {
+        if (!window.pywebview?.api || !this.id) return;
+        pywebview.api
             .dir_exists({
                 folder: this.state.value,
-                type: this.idRef.current.id
+                type: this.id
             })
             .then(valid => this.setState({ valid: valid && this.props.isValid }));
-        this.id = this.idRef.current.id;
-        this.setState({ value: this.props.value, valid });
     }
 
     UNSAFE_componentWillReceiveProps(nextProps) {
         if (nextProps.value != this.state.value) {
-            this.setState({ value: nextProps.value }, () => {
-                pywebview.api
-                    .dir_exists({ folder: this.state.value, type: this.id })
-                    .then(valid => this.setState({ valid: valid && this.props.isValid }));
-            });
+            this.setState({ value: nextProps.value }, this.updateValidity);
         }
     }
 
@@ -40,13 +54,12 @@ class FolderInput extends React.Component {
             this.props.onChange({
                 target: { id: this.id, value: this.state.value }
             });
-            pywebview.api
-                .dir_exists({ folder: this.state.value, type: this.id })
-                .then(valid => this.setState({ valid: valid && this.props.isValid }));
+            this.updateValidity();
         }
     }
 
     folderPick() {
+        if (!window.pywebview?.api) return;
         pywebview.api.get_folder({ type: this.id }).then(folder => this.setState({ value: folder || "" }));
     }
 
