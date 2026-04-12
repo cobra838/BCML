@@ -317,6 +317,7 @@ class Api:
                 has_emu = False
         return {
             "hasCemu": has_emu,
+            "firstRun": util.is_first_run(),
             "mergers": [m().friendly_name for m in mergers.get_mergers()],
         }
 

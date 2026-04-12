@@ -28,7 +28,7 @@ class App extends React.Component {
     constructor() {
         super();
         this.state = {
-            tab: "mod-list",
+            tab: null,
             mods: [],
             modsLoaded: false,
             selects: null,
@@ -50,6 +50,7 @@ class App extends React.Component {
             confirmText: "",
             confirmCallback: () => {},
             showAbout: false,
+            firstRun: false,
             update: false,
             changelog: true,
             showChangelog: false,
@@ -61,10 +62,19 @@ class App extends React.Component {
         window.addEventListener("pywebviewready", () => {
             setTimeout(async () => {
                 let settings = await pywebview.api.get_settings();
-                this.setState({ settings }, async () => {
-                    let res = await pywebview.api.get_ver();
-                    this.setState({ ...res });
-                });
+                let setup = await pywebview.api.get_setup();
+                this.setState(
+                    {
+                        settings,
+                        settingsLoaded: true,
+                        firstRun: setup.firstRun,
+                        tab: setup.firstRun ? "settings" : "mod-list"
+                    },
+                    async () => {
+                        let res = await pywebview.api.get_ver();
+                        this.setState({ ...res });
+                    }
+                );
             }, 500);
             setTimeout(() => {
                 this.refreshMods();
@@ -441,6 +451,7 @@ class App extends React.Component {
                         busy: this.state.showProgress,
                         settings: this.state.settings
                     }}>
+                    {this.state.tab && (
                     <Tabs
                         id="tabs"
                         mountOnEnter
@@ -514,6 +525,7 @@ class App extends React.Component {
                             </Button>
                         </Tab>
                     </Tabs>
+                    )}
                 </ModContext.Provider>
                 <ProgressModal
                     show={this.state.showProgress}

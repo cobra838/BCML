@@ -550,6 +550,9 @@ def get_data_dir() -> Path:
     return data_dir
 
 
+FIRST_RUN = not (get_data_dir() / "settings.json").exists()
+
+
 def get_storage_dir() -> Path:
     folder = get_settings("store_dir")
     if not folder:
@@ -656,6 +659,10 @@ def get_settings(name: str = "") -> Any:
         return getattr(get_settings, "settings", {})
     except Exception as err:
         raise RuntimeError("BCML could not load its settings file") from err
+
+
+def is_first_run() -> bool:
+    return FIRST_RUN
 
 
 def save_settings():
