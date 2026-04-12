@@ -222,6 +222,71 @@ class App extends React.Component {
         );
     };
 
+    handleReinstall = async mod => {
+        const options = mod?.path?.length
+            ? await pywebview.api.get_existing_options({ mod })
+            : {
+                  disable: [],
+                  options: {}
+              };
+        if (!this.selects) {
+            await new Promise(resolve =>
+                this.setState(
+                    {
+                        progressTitle: "One Sec",
+                        progressStatus: "Processing",
+                        showProgress: true
+                    },
+                    () => resolve()
+                )
+            );
+            this.selects = await pywebview.api.check_mod_options({ mods: [mod.path] });
+            await new Promise(resolve =>
+                this.setState(
+                    {
+                        showProgress: true
+                    },
+                    () => resolve()
+                )
+            );
+        }
+        const num_selects = Object.keys(this.selects).length;
+        if (num_selects > 0 && num_selects > (this.state.selects?.length || 0)) {
+            this.installArgs = { mode: "reinstall", mod, options };
+            this.setState({
+                selectPath: Object.keys(this.selects)[0],
+                selectMod: this.selects[Object.keys(this.selects)[0]]
+            });
+            return;
+        }
+        this.setState(
+            {
+                showProgress: true,
+                progressTitle: "Reinstalling Mod"
+            },
+            () => {
+                pywebview.api
+                    .reinstall_mod({ mod, options, selects: this.state.selects })
+                    .then(res => {
+                        if (!res.success) {
+                            throw res.error;
+                        }
+                        this.selects = null;
+                        this.installArgs = null;
+                        this.setState(
+                            {
+                                showProgress: false,
+                                showDone: false,
+                                selects: {}
+                            },
+                            () => this.refreshMods()
+                        );
+                    })
+                    .catch(this.showError);
+            }
+        );
+    };
+
     handleBackups = (backup, operation) => {
         let progressTitle;
         let action;
@@ -444,6 +509,7 @@ class App extends React.Component {
                                 onConfirm={this.confirm}
                                 onChange={mods => this.setState({ mods })}
                                 onInstall={this.handleInstall}
+                                onReinstall={this.handleReinstall}
                                 onError={this.showError}
                                 onProgress={this.setProgress}
                                 onDone={() =>
@@ -576,10 +642,14 @@ class App extends React.Component {
                                 }
                             },
                             () => {
-                                this.handleInstall(
-                                    this.installArgs.mods,
-                                    this.installArgs.options
-                                );
+                                if (this.installArgs.mode == "reinstall") {
+                                    this.handleReinstall(this.installArgs.mod);
+                                } else {
+                                    this.handleInstall(
+                                        this.installArgs.mods,
+                                        this.installArgs.options
+                                    );
+                                }
                             }
                         );
                     }}

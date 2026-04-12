@@ -139,6 +139,15 @@ class ModInfo extends React.Component {
                             onClick={() => this.props.onAction("update")}>
                             <i className="material-icons">update</i> <span>Update</span>
                         </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            title="Reinstall"
+                            disabled={!this.props.mod || this.props.multi}
+                            onClick={() => this.props.onAction("reinstall")}>
+                            <i className="material-icons">autorenew</i>{" "}
+                            <span>Reinstall</span>
+                        </Button>
                         {this.state.processed && !this.context.settings?.strip_gfx && (
                             <Button
                                 variant="secondary"

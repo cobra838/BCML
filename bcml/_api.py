@@ -196,6 +196,12 @@ class Api:
     def get_settings(self, params=None):
         return util.get_settings()
 
+    def get_existing_options(self, params):
+        mod = BcmlMod.from_json(params["mod"])
+        if (mod.path / "options.json").exists():
+            return json.loads((mod.path / "options.json").read_text())
+        return {"options": {}, "disable": []}
+
     def guess_export_dir(self, params):
         return str(
             util.guess_export_dir_from_emu(
@@ -389,11 +395,16 @@ class Api:
         util.save_profile(profile_name)
 
     def check_mod_options(self, params):
-        metas = {
-            mod: install.extract_mod_meta(Path(mod))
-            for mod in params["mods"]
-            if mod.endswith(".bnp")
-        }
+        metas = {}
+        for mod in params["mods"]:
+            mod_path = Path(mod)
+            if mod_path.is_dir() and (mod_path / "info.json").exists():
+                try:
+                    metas[mod] = json.loads((mod_path / "info.json").read_text("utf-8"))
+                except Exception:  # pylint: disable=broad-except
+                    metas[mod] = {}
+            elif mod.endswith(".bnp"):
+                metas[mod] = install.extract_mod_meta(mod_path)
         return {
             mod: meta
             for mod, meta in metas.items()
@@ -445,6 +456,30 @@ class Api:
                 pool=pool,
                 updated=True,
             )
+
+    @win_or_lose
+    @install.refresher
+    def reinstall_mod(self, params):
+        mod = BcmlMod.from_json(params["mod"])
+        if (mod.path / "options.json").exists():
+            options = json.loads((mod.path / "options.json").read_text())
+        else:
+            options = {"options": {}, "disable": []}
+        if "options" in params and params["options"]:
+            options = params["options"]
+        source = Path(mkdtemp()) / mod.path.name
+        copytree(mod.path, source)
+        rmtree(mod.path)
+        with util.start_pool() as pool:
+            install.install_mod(
+                source,
+                insert_priority=mod.priority,
+                options=options,
+                selects=params.get("selects"),
+                pool=pool,
+                updated=True,
+            )
+            install.refresh_merges()
 
     @win_or_lose
     def reprocess(self, params):
