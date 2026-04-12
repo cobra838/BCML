@@ -607,11 +607,15 @@ def create_backup(name: str = ""):
         name = f'BCML_Backup_{datetime.datetime.now().strftime("%Y-%m-%d")}'
     else:
         name = re.sub(r"(?u)[^-\w.]", "", name.strip().replace(" ", "_"))
+    modpack_dir = util.get_modpack_dir().resolve()
     num_mods = len([d for d in util.get_modpack_dir().glob("*") if d.is_dir()])
-    output = util.get_storage_dir() / "backups" / f"{name}---{num_mods - 1}.7z"
+    output = (util.get_storage_dir() / "backups" / f"{name}---{num_mods - 1}.7z").resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     print(f"Saving backup {name}...")
-    x_args = [get_7z_path(), "a", str(output), f'{str(util.get_modpack_dir() / "*")}']
+    archive_items = [item.name for item in modpack_dir.iterdir()]
+    if not archive_items:
+        raise FileNotFoundError("No installed mods were found to back up.")
+    x_args = [get_7z_path(), "a", str(output), *archive_items]
     if system() == "Windows":
         subprocess.run(
             x_args,
@@ -619,10 +623,11 @@ def create_backup(name: str = ""):
             stderr=subprocess.PIPE,
             creationflags=util.CREATE_NO_WINDOW,
             check=True,
+            cwd=str(modpack_dir),
         )
     else:
         subprocess.run(
-            x_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+            x_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, cwd=str(modpack_dir),
         )
     print(f'Backup "{name}" created')
 
@@ -634,13 +639,18 @@ def get_backups() -> List[Path]:
 def restore_backup(backup: Union[str, Path]):
     if isinstance(backup, str):
         backup = Path(backup)
+    backup = backup.resolve()
+    modpack_dir = util.get_modpack_dir().resolve()
     if not backup.exists():
         raise FileNotFoundError(f'The backup "{backup.name}" does not exist.')
     print("Clearing installed mods...")
-    for folder in [item for item in util.get_modpack_dir().glob("*") if item.is_dir()]:
-        shutil.rmtree(str(folder))
+    for item in modpack_dir.iterdir():
+        if item.is_dir():
+            shutil.rmtree(str(item))
+        else:
+            item.unlink()
     print("Extracting backup...")
-    x_args = [get_7z_path(), "x", str(backup), f"-o{str(util.get_modpack_dir())}"]
+    x_args = [get_7z_path(), "x", str(backup), f"-o{str(modpack_dir)}"]
     if system() == "Windows":
         subprocess.run(
             x_args,
