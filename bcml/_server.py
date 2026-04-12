@@ -13,5 +13,5 @@ class BcmlRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def start_server(port: int):
-    with socketserver.TCPServer(("", port), BcmlRequestHandler) as httpd:
+    with socketserver.TCPServer(("127.0.0.1", port), BcmlRequestHandler) as httpd:
         httpd.serve_forever()

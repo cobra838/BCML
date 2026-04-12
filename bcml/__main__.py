@@ -154,7 +154,7 @@ def main(debug: bool = False):
     # with redirect_stderr(sys.stdout):
     #     with redirect_stdout(messager):  # type: ignore
     sleep(0.25)
-    webview.start(gui=gui, debug=debug, http_server=True, func=_oneclick.process_arg)
+    webview.start(gui=gui, debug=debug, func=_oneclick.process_arg)
     api.cleanup()
     stop_it()  # messager=messager)
 
