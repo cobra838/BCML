@@ -34,6 +34,31 @@ impl std::fmt::Display for Language {
     }
 }
 
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportMethod {
+    Copy,
+    #[default]
+    HardLink,
+    Symlink,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WiiuExportLayout {
+    WithoutNamedFolder,
+    #[default]
+    WithNamedFolder,
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwitchExportLayout {
+    #[default]
+    Emulator,
+    Atmosphere,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default = "default_store_dir")]
@@ -65,6 +90,12 @@ pub struct Settings {
     #[serde(default)]
     pub export_dir_nx: PathBuf,
     #[serde(default)]
+    pub export_method: ExportMethod,
+    #[serde(default)]
+    pub export_layout: WiiuExportLayout,
+    #[serde(default)]
+    pub export_layout_nx: SwitchExportLayout,
+    #[serde(default)]
     pub load_reverse: bool,
     #[serde(default)]
     pub site_meta: PathBuf,
@@ -90,7 +121,11 @@ pub struct Settings {
 
 #[inline]
 fn default_store_dir() -> PathBuf {
-    DATA_DIR.clone()
+    if is_portable_mode() {
+        PathBuf::from("bcml-data")
+    } else {
+        DATA_DIR.clone()
+    }
 }
 
 #[inline]
@@ -118,6 +153,9 @@ impl Default for Settings {
             dlc_dir_nx: Default::default(),
             export_dir: Default::default(),
             export_dir_nx: Default::default(),
+            export_method: Default::default(),
+            export_layout: Default::default(),
+            export_layout_nx: Default::default(),
             force_7z: Default::default(),
             game_dir: Default::default(),
             game_dir_nx: Default::default(),
@@ -136,6 +174,23 @@ impl Default for Settings {
 }
 
 impl Settings {
+    fn normalize(&mut self) {
+        if matches!(self.export_layout, WiiuExportLayout::WithNamedFolder)
+            && self
+                .export_dir
+                .file_name()
+                .map(|name| name.eq_ignore_ascii_case("BreathOfTheWild_BCML"))
+                .unwrap_or(false)
+        {
+            if let Some(parent) = self.export_dir.parent() {
+                self.export_dir = parent.to_path_buf();
+            }
+        }
+        if self.no_hardlinks && matches!(self.export_method, ExportMethod::HardLink) {
+            self.export_method = ExportMethod::Copy;
+        }
+    }
+
     pub fn path() -> PathBuf {
         DATA_DIR.join("settings.json")
     }
@@ -180,22 +235,15 @@ impl Settings {
 
     pub fn export_dir(&self) -> Option<PathBuf> {
         if self.wiiu {
-            if self.no_cemu {
-                if self
-                    .export_dir
-                    .to_str()
-                    .map(|d| d.is_empty())
-                    .unwrap_or_default()
-                {
-                    None
-                } else {
-                    Some(self.export_dir.clone())
-                }
+            if self
+                .export_dir
+                .to_str()
+                .map(|d| d.is_empty())
+                .unwrap_or_default()
+            {
+                None
             } else {
-                #[cfg(target_os = "windows")]
-                return Some(self.cemu_dir.join("graphicPacks/BreathOfTheWild_BCML"));
-                #[cfg(target_os = "linux")]
-                return Some("~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML".into());
+                Some(self.export_dir.clone())
             }
         } else {
             if self
@@ -211,6 +259,14 @@ impl Settings {
         }
     }
 
+    pub fn export_method(&self) -> ExportMethod {
+        if self.no_hardlinks {
+            ExportMethod::Copy
+        } else {
+            self.export_method
+        }
+    }
+
     pub fn master_mod_dir(&self) -> PathBuf {
         self.mods_dir().join("9999_BCML")
     }
@@ -219,7 +275,7 @@ impl Settings {
         self.master_mod_dir().join(if self.wiiu {
             "content"
         } else {
-            "01007EF00011E000/romfs"
+            crate::util::SWITCH_CONTENT_PATH
         })
     }
 
@@ -227,7 +283,7 @@ impl Settings {
         self.master_mod_dir().join(if self.wiiu {
             "aoc/0010"
         } else {
-            "01007EF00011F001/romfs"
+            crate::util::SWITCH_DLC_PATH
         })
     }
 
@@ -248,8 +304,11 @@ impl Settings {
     pub fn reload(&mut self) -> Result<()> {
         *self = if Self::path().exists() {
             let text = fs::read_to_string(&Self::path()).unwrap();
-            serde_json::from_str(&text.cow_replace(": null", ": \"\""))
-                .expect("Failed to read settings file")
+            let mut settings: Settings =
+                serde_json::from_str(&text.cow_replace(": null", ": \"\""))
+                    .expect("Failed to read settings file");
+            settings.normalize();
+            settings
         } else {
             println!("WARNING: Settings file does not exist, loading default settings...");
             Settings::default()
@@ -267,8 +326,10 @@ pub static SETTINGS: Lazy<Arc<RwLock<Settings>>> = Lazy::new(|| {
     let settings_path = Settings::path();
     Arc::new(RwLock::new(if settings_path.exists() {
         let text = fs::read_to_string(&settings_path).expect("Couldn't read settings, that's bad");
-        serde_json::from_str(&text.cow_replace(": null", ": \"\""))
-            .expect("Failed to read settings file")
+        let mut settings: Settings = serde_json::from_str(&text.cow_replace(": null", ": \"\""))
+            .expect("Failed to read settings file");
+        settings.normalize();
+        settings
     } else {
         println!("WARNING: Settings file does not exist, loading default settings...");
         Settings::default()
@@ -279,8 +340,10 @@ pub static TMP_SETTINGS: Lazy<Arc<RwLock<Settings>>> = Lazy::new(|| {
     let settings_path = Settings::tmp_path();
     Arc::new(RwLock::new(if settings_path.exists() {
         let text = fs::read_to_string(&settings_path).expect("Chouldn't read settings, that's bad");
-        serde_json::from_str(&text.cow_replace(": null", ": \"\""))
-            .expect("Failed to read temp settings file")
+        let mut settings: Settings = serde_json::from_str(&text.cow_replace(": null", ": \"\""))
+            .expect("Failed to read temp settings file");
+        settings.normalize();
+        settings
     } else {
         println!("WARNING: Temp settings file does not exist, loading default settings...");
         Settings::default()

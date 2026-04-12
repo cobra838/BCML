@@ -398,12 +398,12 @@ def install_mod(
                             except (ValueError, oead.InvalidDataError, RuntimeError):
                                 out.unlink()
                                 os.link(file, out)
+                                continue
                             try:
                                 link_sarc = oead.Sarc(
                                     util.unyaz_if_needed(file.read_bytes())
                                 )
                             except (ValueError, oead.InvalidDataError, RuntimeError):
-                                del old_sarc
                                 continue
                             new_sarc = oead.SarcWriter.from_sarc(link_sarc)
                             link_files = {f.name for f in link_sarc.get_files()}
@@ -607,11 +607,15 @@ def create_backup(name: str = ""):
         name = f'BCML_Backup_{datetime.datetime.now().strftime("%Y-%m-%d")}'
     else:
         name = re.sub(r"(?u)[^-\w.]", "", name.strip().replace(" ", "_"))
+    modpack_dir = util.get_modpack_dir().resolve()
     num_mods = len([d for d in util.get_modpack_dir().glob("*") if d.is_dir()])
-    output = util.get_storage_dir() / "backups" / f"{name}---{num_mods - 1}.7z"
+    output = (util.get_storage_dir() / "backups" / f"{name}---{num_mods - 1}.7z").resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     print(f"Saving backup {name}...")
-    x_args = [get_7z_path(), "a", str(output), f'{str(util.get_modpack_dir() / "*")}']
+    archive_items = [item.name for item in modpack_dir.iterdir()]
+    if not archive_items:
+        raise FileNotFoundError("No installed mods were found to back up.")
+    x_args = [get_7z_path(), "a", str(output), *archive_items]
     if system() == "Windows":
         subprocess.run(
             x_args,
@@ -619,10 +623,11 @@ def create_backup(name: str = ""):
             stderr=subprocess.PIPE,
             creationflags=util.CREATE_NO_WINDOW,
             check=True,
+            cwd=str(modpack_dir),
         )
     else:
         subprocess.run(
-            x_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+            x_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, cwd=str(modpack_dir),
         )
     print(f'Backup "{name}" created')
 
@@ -634,13 +639,18 @@ def get_backups() -> List[Path]:
 def restore_backup(backup: Union[str, Path]):
     if isinstance(backup, str):
         backup = Path(backup)
+    backup = backup.resolve()
+    modpack_dir = util.get_modpack_dir().resolve()
     if not backup.exists():
         raise FileNotFoundError(f'The backup "{backup.name}" does not exist.')
     print("Clearing installed mods...")
-    for folder in [item for item in util.get_modpack_dir().glob("*") if item.is_dir()]:
-        shutil.rmtree(str(folder))
+    for item in modpack_dir.iterdir():
+        if item.is_dir():
+            shutil.rmtree(str(item))
+        else:
+            item.unlink()
     print("Extracting backup...")
-    x_args = [get_7z_path(), "x", str(backup), f"-o{str(util.get_modpack_dir())}"]
+    x_args = [get_7z_path(), "x", str(backup), f"-o{str(modpack_dir)}"]
     if system() == "Windows":
         subprocess.run(
             x_args,
@@ -659,7 +669,7 @@ def restore_backup(backup: Union[str, Path]):
 
 
 def enable_bcml_gfx():
-    if util.get_settings("no_cemu"):
+    if util.get_settings("no_cemu") or not util.get_settings("wiiu"):
         return
 
     settings = util.parse_cemu_settings()
@@ -693,7 +703,18 @@ def enable_bcml_gfx():
         entry.appendChild(entrypreset)
         gpack.appendChild(entry)
 
-    create_entry("graphicPacks\\BreathOfTheWild_BCML\\rules.txt")
+    output_root = Path(util.get_settings("export_dir")) if util.get_settings("export_dir") else util.get_cemu_dir() / "graphicPacks"
+    package_root = (
+        output_root / "BreathOfTheWild_BCML"
+        if util.get_settings().get("export_layout", "with_named_folder") == "with_named_folder"
+        else output_root
+    )
+    rules_file = package_root / "rules.txt"
+    try:
+        create_entry(str(rules_file.relative_to(util.get_cemu_dir())).replace("/", "\\"))
+    except ValueError:
+        if rules_file.exists():
+            create_entry(str(rules_file))
 
     if (util.get_cemu_dir() / "graphicPacks" / "bcmlPatches").exists():
         for rules in (util.get_cemu_dir() / "graphicPacks" / "bcmlPatches").rglob(
@@ -709,7 +730,7 @@ def enable_bcml_gfx():
 
 
 def disable_bcml_gfx():
-    if not util.get_settings("no_cemu"):
+    if not util.get_settings("no_cemu") and util.get_settings("wiiu"):
         settings = util.parse_cemu_settings()
         try:
             gpack = settings.getElementsByTagName("GraphicPack")[0]
@@ -750,7 +771,7 @@ def link_master_mod(output: Path = None):
                 "probably because Cemu is on an external USB, eSATA, or "
                 "network drive. You can fix this in one of two ways:\n"
                 "- Make sure Cemu is on an internal drive\n"
-                "- Turn on the 'no hard links' option in BCML's settings "
+                "- Change Export Method to Copy in BCML's settings "
                 "(but be aware that mod merging will take much longer)"
             ) from err
         else:

@@ -30,13 +30,8 @@ class Mods extends React.Component {
             mergers: [],
             hasCemu: false
         };
-        window.addEventListener("pywebviewready", () =>
-            pywebview.api
-                .get_setup()
-                .then(setup =>
-                    this.setState({ mergersReady: true, ...setup }, this.sanityCheck)
-                )
-        );
+        this.loadSetup = this.loadSetup.bind(this);
+        window.addEventListener("pywebviewready", this.loadSetup);
         window.handleKeyMods = e => {
             if (e.ctrlKey) {
                 switch (e.key) {
@@ -66,7 +61,11 @@ class Mods extends React.Component {
                         this.handleRemerge("all");
                         break;
                     case "l":
-                        this.props.onLaunch();
+                        if (this.context.settings?.wiiu) {
+                            this.launchCemu();
+                        } else {
+                            this.props.onLaunch();
+                        }
                         break;
                     case "h":
                         this.setState({ showDisabled: !this.state.showDisabled });
@@ -92,6 +91,24 @@ class Mods extends React.Component {
         document.addEventListener("drop", this.handleDrop);
     }
 
+    componentDidMount() {
+        if (window.pywebview?.api) {
+            this.loadSetup();
+        }
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener("pywebviewready", this.loadSetup);
+    }
+
+    loadSetup() {
+        pywebview.api
+            .get_setup()
+            .then(setup =>
+                this.setState({ mergersReady: true, ...setup }, this.sanityCheck)
+            );
+    }
+
     defaultSelect = () => {
         if (this.context.mods.length > 0) {
             return [this.context.mods[0]];
@@ -108,13 +125,7 @@ class Mods extends React.Component {
             })
             .catch(err => {
                 console.error(err);
-                this.props.onError({
-                    short:
-                        err.short +
-                        " The setup wizard will be relaunched in 5 seconds.",
-                    error_text: err.error_text
-                });
-                setTimeout(() => (window.location = "index.html?firstrun=true"), 5000);
+                this.props.onError(err);
             });
     };
 
@@ -190,6 +201,7 @@ class Mods extends React.Component {
                         } else {
                             this.props.onError(err);
                         }
+                        throw err;
                     }
                 });
             }
@@ -531,13 +543,24 @@ class Mods extends React.Component {
                                     <OverlayTrigger
                                         overlay={
                                             <Tooltip>
-                                                Launch Breath of the Wild (Ctrl+L)
+                                                {this.context.settings?.wiiu
+                                                    ? "Launch EMU (Ctrl+L)"
+                                                    : "Launch EMU (Ctrl+L)"}
                                             </Tooltip>
                                         }>
                                         <Button
                                             variant="primary"
                                             size="xs"
-                                            onClick={this.props.onLaunch}>
+                                            onClick={
+                                                this.context.settings?.wiiu
+                                                    ? this.launchCemu
+                                                    : this.props.onLaunch
+                                            }
+                                            title={
+                                                this.context.settings?.wiiu
+                                                    ? "Launch EMU"
+                                                    : "Launch EMU"
+                                            }>
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 x="0px"
@@ -579,12 +602,26 @@ class Mods extends React.Component {
                                         id="dropdown-split-basic"
                                     />
                                     <Dropdown.Menu>
-                                        <Dropdown.Item onClick={this.launchNoMod}>
-                                            Launch without mods
-                                        </Dropdown.Item>
-                                        <Dropdown.Item onClick={this.launchCemu}>
-                                            Launch Cemu without starting game
-                                        </Dropdown.Item>
+                                        {this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.props.onLaunch}>
+                                                Launch Breath of the Wild
+                                            </Dropdown.Item>
+                                        )}
+                                        {this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.launchNoMod}>
+                                                Launch Breath of the Wild without mods
+                                            </Dropdown.Item>
+                                        )}
+                                        {!this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.launchNoMod}>
+                                                Launch EMU
+                                            </Dropdown.Item>
+                                        )}
+                                        {this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.launchCemu}>
+                                                Launch EMU without starting game
+                                            </Dropdown.Item>
+                                        )}
                                     </Dropdown.Menu>
                                 </Dropdown>
                             )}

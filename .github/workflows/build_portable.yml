@@ -104,6 +104,7 @@ jobs:
             throw "aamp data file not found: $aampData"
           }
           & "$env:PYTHON_EXE" -m PyInstaller --onedir --windowed --name BCML `
+            --icon "bcml/data/bcml.ico" `
             --collect-all bcml `
             --collect-all aamp `
             --collect-all byml `

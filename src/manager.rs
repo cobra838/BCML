@@ -1,9 +1,10 @@
-use crate::{settings::Settings, util, Result};
+use crate::{
+    settings::{ExportMethod, Settings, SwitchExportLayout, WiiuExportLayout},
+    util, Result,
+};
 use anyhow::Context;
 use fs_err as fs;
 use join_str::jstr;
-#[cfg(windows)]
-use mslnk::ShellLink;
 use parking_lot::RwLockReadGuard;
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -12,29 +13,16 @@ use remove_dir_all::remove_dir_all;
 #[cfg(not(windows))]
 use std::fs::remove_dir_all;
 use std::path::PathBuf;
+#[cfg(windows)]
+use std::{fs as stdfs, io::ErrorKind};
+#[cfg(windows)]
+use std::{thread, time::Duration};
 
 pub fn manager_mod(py: Python, parent: &PyModule) -> PyResult<()> {
     let manager_module = PyModule::new(py, "manager")?;
-    #[cfg(windows)]
-    manager_module.add_wrapped(wrap_pyfunction!(create_shortcut))?;
     manager_module.add_wrapped(wrap_pyfunction!(link_master_mod))?;
     parent.add_submodule(manager_module)?;
     Ok(())
-}
-
-#[cfg(windows)]
-#[pyfunction]
-fn create_shortcut(_py: Python, py_path: String, ico_path: String, dest: String) -> PyResult<()> {
-    let make = || -> anyhow::Result<()> {
-        let mut link = ShellLink::new(&py_path)?;
-        link.set_arguments(Some("-m bcml".into()));
-        link.set_name(Some("BCML".into()));
-        link.set_icon_location(Some(ico_path));
-        fs::create_dir_all(std::path::Path::new(&dest).parent().unwrap())?;
-        link.create_lnk(&dest)?;
-        Ok(())
-    };
-    Ok(make()?)
 }
 
 static RULES_TXT: &str = r#"[Definition]
@@ -49,16 +37,15 @@ fsPriority = 9999
 
 struct ModLinker<'py, 'set> {
     merged: PathBuf,
-    output: PathBuf,
+    output: Option<PathBuf>,
     needs_rules: bool,
     rules_path: PathBuf,
-    can_link: bool,
     settings: RwLockReadGuard<'set, Settings>,
     py: Python<'py>,
 }
 
 impl<'py, 'set> ModLinker<'py, 'set> {
-    fn new(py: Python<'py>, output: PathBuf) -> Self {
+    fn new(py: Python<'py>, output: Option<PathBuf>) -> Self {
         let settings = util::settings();
         let merged = settings.merged_modpack_dir();
         Self {
@@ -66,7 +53,6 @@ impl<'py, 'set> ModLinker<'py, 'set> {
             py,
             needs_rules: !settings.no_cemu && settings.wiiu,
             rules_path: merged.join("rules.txt"),
-            can_link: true,
             merged,
             settings,
         }
@@ -110,7 +96,6 @@ impl<'py, 'set> ModLinker<'py, 'set> {
                         .collect::<Vec<PathBuf>>()
                 })
                 .collect();
-        dbg!(&mod_folders);
         py.allow_threads(|| -> Result<()> {
             mod_folders
                 .into_iter()
@@ -162,170 +147,203 @@ impl<'py, 'set> ModLinker<'py, 'set> {
         Ok(())
     }
 
-    fn link_external(&mut self) -> Result<()> {
-        let Self {
-            merged,
-            output,
-            needs_rules,
-            rules_path,
-            can_link,
-            settings,
-            py: _,
-        } = self;
-        let exists = output.exists();
-        let is_link = {
+    fn remove_target(target: &PathBuf) -> Result<()> {
+        #[cfg(windows)]
+        {
+            match stdfs::remove_dir(target) {
+                Ok(()) => return Ok(()),
+                Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+                Err(_) => {}
+            }
+            if junction::exists(target).unwrap_or(false) {
+                junction::delete(target).context("Failed to remove output junction")?;
+                return Ok(());
+            }
+        }
+        let meta = match fs::symlink_metadata(target) {
+            Ok(meta) => meta,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(err) => return Err(err).context("Failed to stat output target"),
+        };
+        if meta.file_type().is_symlink() || meta.is_file() {
+            fs::remove_file(target).context("Failed to remove output file link")?;
+        } else {
             #[cfg(windows)]
             {
-                junction::exists(&output).unwrap_or(false) || output.is_symlink()
+                match stdfs::remove_dir(target) {
+                    Ok(()) => return Ok(()),
+                    Err(err) if err.kind() == ErrorKind::NotFound => return Ok(()),
+                    Err(_) => {}
+                }
             }
-            #[cfg(unix)]
-            {
-                output.is_symlink()
+            remove_dir_all(target).context("Failed to clear output folder")?;
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn ensure_target_removed(target: &PathBuf) -> Result<()> {
+        for _ in 0..20 {
+            Self::remove_target(target)?;
+            if fs::symlink_metadata(target).is_err() {
+                return Ok(());
             }
+            thread::sleep(Duration::from_millis(25));
+        }
+        anyhow::bail!("Failed to remove existing output target: {}", target.display())
+    }
+
+    fn prepare_target_parent(target: &PathBuf) -> Result<()> {
+        let Some(parent) = target.parent().map(PathBuf::from) else {
+            return Ok(());
         };
-        let should_be_link = !settings.no_hardlinks && *can_link;
-        // Only if the output folder exists and is a symlink and is supposed to
-        // be a symlink, we're done. If it is a real folder, or it is a link
-        // when it should be a real folder, or it doesn't exist, we must proceed
-        // to set up the output folder.
-        if !(exists && is_link && should_be_link) {
-            println!("Preparing output folder at {}", output.display());
-            if should_be_link {
-                println!(
-                    "Attempting to link output folder at {} to merged folder",
-                    output.display()
-                );
-                if !is_link && exists {
-                    // If `no_hard_links` is not enabled, then this existing folder
-                    // is probably leftover from someone upgrading or changing
-                    // their hard link setting, in which case we should remove the
-                    // output folder entirely to make way for the new link.
-                    remove_dir_all(&output).context("Failed to clear output folder")?;
-                }
-                #[cfg(target_os = "linux")]
-                std::os::unix::fs::symlink(merged, &output)
-                    .context("Failed to symlink output folder")?;
-                #[cfg(target_os = "windows")]
-                {
-                    match junction::create(&merged, &output) {
-                        Ok(()) => (),
-                        Err(_) => {
-                            println!("Junction failed, trying a symlink");
-                            let arg_list = format!(
-                                "Start-Process -FilePath cmd -ArgumentList '/c,mklink,/d,\"{}\",\"{}\"' -Verb RunAs",
-                                output.to_str().unwrap(),
-                                merged.to_str().unwrap()
-                            );
-                            let res = std::process::Command::new("powershell")
-                                .arg(arg_list)
-                                .output()
-                                .expect("Failed to spawn mklink process");
-                            if !res.status.success() {
-                                anyhow::bail!(String::from_utf8_lossy(&res.stderr).to_string());
-                            }
-                        }
-                    }
-                }
-                if !output.exists() || fs::read_dir(&output).map(|r| r.count()).unwrap_or(0) == 0 {
-                    println!("Problem linking output folder, let's try copying instead");
-                    *can_link = false;
-                    return self.link_external();
-                }
-            } else {
-                // If there is already a linked folder (e.g. after settings change),
-                // then we should remove it.
-                if exists && is_link {
-                    #[cfg(windows)]
-                    junction::delete(&output)
-                        .or_else(|_| fs::remove_file(&output))
-                        .or_else(|_| fs::remove_dir(&output))
-                        .context("Failed to remove output folder link")?;
-                    #[cfg(unix)]
-                    fs::remove_file(&output)
-                        .or_else(|_| fs::remove_dir(&output))
-                        .context("Failed to remove output folder link")?;
-                }
-                if !exists {
-                    fs::create_dir_all(&output).context("Failed to create output folder")?;
-                }
-                // If `no_hard_links` is enabled, then we can save some trouble by
-                // only clearing actual mod content instead of the whole output
-                // folder. Among other benefits, this lets us keep mods for other
-                // games when the output folder is `/atmosphere/contents` and
-                // reduces the risk of accidentally deleting whatever else when
-                // people set their output folders badly.
-                let (content, dlc) = (util::content(), util::dlc());
-                let (merged_content, out_content) = (merged.join(content), output.join(content));
-                let (merged_dlc, out_dlc) = (merged.join(dlc), output.join(dlc));
-                std::thread::scope(|scope| -> Result<()> {
-                    let t1 = scope.spawn(|| -> Result<()> {
-                        if out_content.exists() {
-                            remove_dir_all(&out_content)
-                                .context("Failed to clear output content folder")?;
-                        }
-                        if merged_content.exists() {
-                            dircpy::copy_dir(&merged_content, &out_content)
-                                .context("Failed to copy output content folder")?;
-                        }
-                        Ok(())
-                    });
-                    let t2 = scope.spawn(|| -> Result<()> {
-                        if out_dlc.exists() {
-                            remove_dir_all(&out_dlc)
-                                .context("Failed to clear output DLC folder")?;
-                        }
-                        if merged_dlc.exists() {
-                            dircpy::copy_dir(&merged_dlc, &out_dlc)
-                                .context("Failed to copy output DLC folder")?;
-                        }
-                        Ok(())
-                    });
-                    t1.join().unwrap()?;
-                    t2.join().unwrap()?;
-                    Ok(())
-                })?;
-                dbg!(*needs_rules);
-                if *needs_rules {
-                    fs::copy(&rules_path, output.join("rules.txt"))?;
-                    // For Waikuteru's, and other mods that contain Cemu code patches
-                    let (merged_patches, out_patches) =
-                        (merged.join("patches"), output.join("patches"));
-                    if out_patches.exists() {
-                        remove_dir_all(&out_patches)
-                            .context("Failed to clear output patches folder")?;
-                    }
-                    if merged_patches.exists() {
-                        dircpy::copy_dir(&merged_patches, &out_patches)
-                            .context("Failed to copy output patches folder")?;
-                    }
-                }
+        #[cfg(windows)]
+        {
+            if junction::exists(&parent).unwrap_or(false) {
+                Self::remove_target(&parent)?;
             }
         }
-        if glob::glob(&output.join("*").to_string_lossy())
-            .expect("Bad glob?!?!?!")
-            .filter_map(|p| p.ok())
-            .count()
-            == 0
-            && std::fs::read_dir(settings.mods_dir())?.count() > 1
-        {
-            Err(anyhow::anyhow!("Output folder is empty"))
-        } else {
-            Ok(())
+        if let Ok(meta) = fs::symlink_metadata(&parent) {
+            if meta.file_type().is_symlink() || meta.is_file() {
+                Self::remove_target(&parent)?;
+            }
         }
+        fs::create_dir_all(&parent).context("Failed to create parent output folder")?;
+        Ok(())
+    }
+
+    fn deploy_dir(method: ExportMethod, source: &PathBuf, target: &PathBuf) -> Result<()> {
+        #[cfg(windows)]
+        Self::ensure_target_removed(target)?;
+        #[cfg(not(windows))]
+        Self::remove_target(target)?;
+        if !source.exists() {
+            return Ok(());
+        }
+        Self::prepare_target_parent(target)?;
+        match method {
+            ExportMethod::Copy => {
+                dircpy::copy_dir(source, target).context("Failed to copy output folder")?;
+            }
+            ExportMethod::HardLink => {
+                #[cfg(windows)]
+                junction::create(source, target).context("Failed to create output junction")?;
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(source, target)
+                    .context("Failed to create output symlink")?;
+            }
+            ExportMethod::Symlink => {
+                #[cfg(windows)]
+                std::os::windows::fs::symlink_dir(source, target)
+                    .context("Failed to create output symlink")?;
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(source, target)
+                    .context("Failed to create output symlink")?;
+            }
+        }
+        Ok(())
+    }
+
+    fn external_targets(&self) -> Option<(Vec<(PathBuf, PathBuf)>, Option<PathBuf>, ExportMethod)> {
+        let method = if self.output.is_some() {
+            ExportMethod::Copy
+        } else {
+            self.settings.export_method()
+        };
+        if let Some(output) = &self.output {
+            return Some((
+                vec![
+                    (self.merged.join(util::content()), output.join(util::content())),
+                    (self.merged.join(util::dlc()), output.join(util::dlc())),
+                ],
+                self.settings.wiiu.then(|| output.clone()),
+                method,
+            ));
+        }
+        let output_root = self.settings.export_dir()?;
+        if self.settings.wiiu {
+            let package_root = match self.settings.export_layout {
+                WiiuExportLayout::WithNamedFolder => output_root.join("BreathOfTheWild_BCML"),
+                WiiuExportLayout::WithoutNamedFolder => output_root,
+            };
+            Some((
+                vec![
+                    (
+                        self.merged.join("content"),
+                        package_root.join("content"),
+                    ),
+                    (
+                        self.merged.join("aoc/0010"),
+                        package_root.join("aoc/0010"),
+                    ),
+                ],
+                Some(package_root),
+                method,
+            ))
+        } else {
+            let title_root = |title_id: &str| match self.settings.export_layout_nx {
+                SwitchExportLayout::Atmosphere => output_root.join(title_id).join("romfs"),
+                SwitchExportLayout::Emulator => output_root
+                    .join(title_id)
+                    .join("BreathOfTheWild_BCML")
+                    .join("romfs"),
+            };
+            let targets = util::SWITCH_BASE_TITLE_IDS
+                .iter()
+                .map(|title_id| {
+                    (
+                        self.merged.join(util::SWITCH_CONTENT_PATH),
+                        title_root(title_id),
+                    )
+                })
+                .chain(util::SWITCH_DLC_TITLE_IDS.iter().map(|title_id| {
+                    (
+                        self.merged.join(util::SWITCH_DLC_PATH),
+                        title_root(title_id),
+                    )
+                }))
+                .collect();
+            Some((
+                targets,
+                None,
+                method,
+            ))
+        }
+    }
+
+    fn link_external(&mut self) -> Result<()> {
+        let Some((targets, rules_root, method)) = self.external_targets() else {
+            return Ok(());
+        };
+        for (source, target) in &targets {
+            Self::deploy_dir(method, source, target)?;
+        }
+        if let Some(root) = rules_root {
+            fs::create_dir_all(&root).context("Failed to create export root")?;
+            if self.rules_path.exists() {
+                fs::copy(&self.rules_path, root.join("rules.txt"))
+                    .context("Failed to copy rules.txt")?;
+            }
+            let merged_patches = self.merged.join("patches");
+            let out_patches = root.join("patches");
+            if merged_patches.exists() {
+                Self::deploy_dir(method, &merged_patches, &out_patches)?;
+            } else {
+                Self::remove_target(&out_patches)?;
+            }
+        }
+        Ok(())
     }
 }
 
 #[pyfunction]
 fn link_master_mod(py: Python, output: Option<String>) -> PyResult<()> {
-    let output = output
-        .map(PathBuf::from)
-        .or_else(|| util::settings().export_dir())
-        .unwrap_or_else(|| util::settings().merged_modpack_dir());
-    let mut linker = ModLinker::new(py, output.clone());
+    let output = output.map(PathBuf::from);
+    let mut linker = ModLinker::new(py, output);
     linker
         .link_internal()
         .context("Failed to link internal merge")?;
-    if output != linker.merged {
+    if linker.output.is_some() || linker.settings.export_dir().is_some() {
         linker
             .link_external()
             .context("Failed to export merged mods")?;

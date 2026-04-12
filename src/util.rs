@@ -15,6 +15,10 @@ pub static HASH_TABLE_WIIU: Lazy<hashes::StockHashTable> =
     Lazy::new(|| hashes::StockHashTable::new(&hashes::Platform::WiiU));
 pub static HASH_TABLE_SWITCH: Lazy<hashes::StockHashTable> =
     Lazy::new(|| hashes::StockHashTable::new(&hashes::Platform::Switch));
+pub const SWITCH_BASE_TITLE_IDS: &[&str] = &["01007EF00011E000"];
+pub const SWITCH_DLC_TITLE_IDS: &[&str] = &["01007EF00011F001"];
+pub const SWITCH_CONTENT_PATH: &str = "01007EF00011E000/romfs";
+pub const SWITCH_DLC_PATH: &str = "01007EF00011F001/romfs";
 static STOCK_PACKS: Lazy<Mutex<HashMap<PathBuf, Arc<Sarc<'static>>>>> =
     Lazy::new(|| Mutex::new(HashMap::default()));
 
@@ -41,7 +45,7 @@ pub fn content() -> &'static str {
     if settings().wiiu {
         "content"
     } else {
-        "01007EF00011E000/romfs"
+        SWITCH_CONTENT_PATH
     }
 }
 
@@ -50,7 +54,7 @@ pub fn dlc() -> &'static str {
     if settings().wiiu {
         "aoc/0010"
     } else {
-        "01007EF00011F001/romfs"
+        SWITCH_DLC_PATH
     }
 }
 

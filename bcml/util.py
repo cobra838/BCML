@@ -496,8 +496,6 @@ def sanity_check():
     get_game_dir()
     if settings["wiiu"]:
         get_update_dir()
-    if not settings["no_cemu"]:
-        get_cemu_dir()
 
 
 @lru_cache(1)
@@ -552,6 +550,9 @@ def get_data_dir() -> Path:
     return data_dir
 
 
+FIRST_RUN = not (get_data_dir() / "settings.json").exists()
+
+
 def get_storage_dir() -> Path:
     folder = get_settings("store_dir")
     if not folder:
@@ -589,9 +590,12 @@ DEFAULT_SETTINGS = {
     "update_dir": "",
     "dlc_dir": "",
     "dlc_dir_nx": "",
-    "store_dir": str(get_data_dir()),
+    "store_dir": "bcml-data" if get_is_portable_mode() else str(get_data_dir()),
     "export_dir": "",
     "export_dir_nx": "",
+    "export_method": "hard_link",
+    "export_layout": "with_named_folder",
+    "export_layout_nx": "emulator",
     "load_reverse": False,
     "site_meta": "",
     "dark_theme": False,
@@ -601,10 +605,7 @@ DEFAULT_SETTINGS = {
     "wiiu": True,
     "no_hardlinks": False,
     "force_7z": False,
-    "suppress_update": False,
     "nsfw": False,
-    "last_version": VERSION,
-    "changelog": True,
     "strip_gfx": False,
     "auto_gb": True,
     "show_gb": False,
@@ -630,12 +631,24 @@ def get_settings(name: str = "") -> Any:
                     if k not in settings:
                         settings[k] = v
                 if settings["store_dir"] == "" or not settings["store_dir"]:
-                    settings["store_dir"] = str(get_data_dir())
-                if settings["cemu_dir"] and not settings["no_cemu"]:
+                    settings["store_dir"] = (
+                        "bcml-data" if get_is_portable_mode() else str(get_data_dir())
+                    )
+                if "export_method" not in settings:
+                    settings["export_method"] = (
+                        "copy" if settings.get("no_hardlinks") else "hard_link"
+                    )
+                if (
+                    settings.get("export_layout", "with_named_folder") == "with_named_folder"
+                    and settings.get("export_dir")
+                    and Path(settings["export_dir"]).name.lower() == "breathofthewild_bcml"
+                ):
+                    settings["export_dir"] = str(Path(settings["export_dir"]).parent)
+                if settings["cemu_dir"] and not settings["no_cemu"] and not settings["export_dir"]:
+                    emu_path = Path(settings["cemu_dir"])
                     settings["export_dir"] = str(
-                        Path(settings["cemu_dir"])
+                        (emu_path.parent if emu_path.suffix.lower() == ".exe" else emu_path)
                         / "graphicPacks"
-                        / "BreathOfTheWild_BCML"
                     )
             setattr(get_settings, "settings", settings)
         if name:
@@ -645,16 +658,80 @@ def get_settings(name: str = "") -> Any:
         raise RuntimeError("BCML could not load its settings file") from err
 
 
+def is_first_run() -> bool:
+    return FIRST_RUN
+
+
 def save_settings():
     with (get_data_dir() / "settings.json").open("w", encoding="utf-8") as s_file:
         json.dump(get_settings.settings, s_file, indent=2)
 
 
+def get_emu_executable() -> Path:
+    emu_path = str(get_settings("cemu_dir"))
+    if not emu_path:
+        raise FileNotFoundError(
+            "The emulator executable has moved or not been saved yet."
+        )
+    path = Path(emu_path)
+    if path.is_file():
+        return path
+    if path.is_dir():
+        for exe in sorted(path.glob("*.exe")):
+            if "cemu" in exe.name.lower():
+                return exe
+        raise FileNotFoundError(
+            "The emulator executable could not be found in the selected folder."
+        )
+    raise FileNotFoundError("The emulator executable has moved or not been saved yet.")
+
+
+def get_emu_base_dir(emu_path: Union[str, Path]) -> Path:
+    path = Path(emu_path)
+    if path.is_dir():
+        return path
+    if path.is_file():
+        return path.parent
+    if path.suffix:
+        return path.parent
+    return path
+def guess_export_dir_from_emu(
+    emu_path: Union[str, Path], wiiu: bool, export_layout_nx: str = "atmosphere"
+) -> Path:
+    if not emu_path:
+        raise FileNotFoundError("No emulator executable has been set.")
+    base_dir = get_emu_base_dir(emu_path)
+    if wiiu:
+        return base_dir / "graphicPacks"
+
+    emu_key = Path(emu_path).name.lower()
+    appdata = Path(os.path.expandvars("%APPDATA%"))
+
+    def nx_layout_path(root: Path, family: str) -> Path:
+        if family == "ryujinx":
+            if export_layout_nx == "emulator":
+                return root / "mods" / "contents"
+            return root / "sdcard" / "atmosphere" / "contents"
+        if export_layout_nx == "emulator":
+            return root / "user" / "load"
+        return root / "sdmc" / "atmosphere" / "contents"
+    if "ryujinx" in emu_key:
+        portable_root = base_dir / "portable"
+        if portable_root.exists():
+            return nx_layout_path(portable_root if export_layout_nx == "emulator" else base_dir, "ryujinx")
+        return nx_layout_path(appdata / "Ryujinx", "ryujinx")
+    for family in ("yuzu", "eden", "citron"):
+        if family in emu_key:
+            if (base_dir / "user").exists():
+                return nx_layout_path(base_dir, family)
+            return nx_layout_path(appdata / family, family)
+    raise FileNotFoundError(
+        "BCML could not determine the default Output Folder for this emulator."
+    )
+
+
 def get_cemu_dir() -> Path:
-    cemu_dir = str(get_settings("cemu_dir"))
-    if not cemu_dir or not Path(cemu_dir).is_dir():
-        raise FileNotFoundError("The Cemu directory has moved or not been saved yet.")
-    return Path(cemu_dir)
+    return get_emu_executable().parent
 
 
 def set_cemu_dir(path: Path):
@@ -1343,25 +1420,6 @@ def create_bcml_graphicpack_if_needed():
         )
 
 
-def create_shortcuts(desktop: bool, start_menu: bool):
-    if desktop:
-        rsext.manager.create_shortcut(
-            str(get_python_exe(True)),
-            str(get_exec_dir() / "data" / "bcml.ico"),
-            str(Path(r"~\Desktop\BCML.lnk").expanduser()),
-        )
-    if start_menu:
-        rsext.manager.create_shortcut(
-            str(get_python_exe(True)),
-            str(get_exec_dir() / "data" / "bcml.ico"),
-            str(
-                Path(
-                    r"~\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\BCML.lnk"
-                ).expanduser()
-            ),
-        )
-
-
 def download_webview2():
     from bcml import native_msg
 
@@ -1490,25 +1548,6 @@ def get_open_port():
     port = s.getsockname()[1]
     s.close()
     return port
-
-
-@lru_cache(1)
-def get_latest_bcml() -> str:
-    try:
-        res = requests.get("https://pypi.org/rss/project/bcml/releases.xml")
-        doc = minidom.parseString(res.text)
-        versions = sorted(
-            (
-                item.getElementsByTagName("title")[0].childNodes[0].data
-                for item in doc.getElementsByTagName("item")
-            ),
-            reverse=True,
-        )
-        if DEBUG:
-            return versions[0]
-        return next(v for v in versions if "a" not in v and "b" not in v)
-    except:  # pylint: disable=bare-except
-        return "0.0.0"
 
 
 class RulesParser(ConfigParser):

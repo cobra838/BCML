@@ -9,11 +9,10 @@ from math import ceil
 from multiprocessing import Pool
 from operator import itemgetter
 from pathlib import Path
-from packaging.version import Version
 from platform import system
 from subprocess import run, PIPE, Popen
 from shutil import copytree, rmtree, copyfile
-from tempfile import NamedTemporaryFile, mkdtemp
+from tempfile import mkdtemp
 from time import sleep
 from threading import Thread
 from typing import Dict, List, Optional
@@ -22,7 +21,7 @@ from xml.dom import minidom
 import requests
 import webview
 
-from bcml import DEBUG, install, dev, locks, mergers, upgrade, util
+from bcml import install, dev, locks, mergers, upgrade, util
 from bcml.util import BcmlMod, LOG, SYSTEM, get_7z_path
 from bcml.__version__ import USER_VERSION, VERSION
 
@@ -65,45 +64,56 @@ class Api:
         self.tmp_files = []
 
     def get_ver(self, params=None):
-        updated = Version(util.get_settings("last_version")) < Version(VERSION)
-        res = {
-            "version": VERSION,
-            "update": (
-                Version(util.get_latest_bcml()) > Version(VERSION)
-                and not util.get_settings("suppress_update")
-            ),
-            "showChangelog": updated and util.get_settings("changelog"),
-        }
-        if updated:
-            util.get_settings()["last_version"] = VERSION
-            util.save_settings()
-        return res
+        return {"version": VERSION}
 
     @win_or_lose
     def sanity_check(self, kwargs=None):
         util.sanity_check()
 
-    def get_folder(self):
+    def get_folder(self, params=None):
         if SYSTEM == "Windows":
             from tkinter import filedialog
             from tkinter import Tk
 
             root = Tk()
             root.attributes("-alpha", 0.0)
-            folder = filedialog.askdirectory(parent=root)
-            return folder if folder != "" else None
+            if params and params.get("type") == "cemu_dir":
+                path = filedialog.askopenfilename(
+                    parent=root,
+                    filetypes=(
+                        ("Executable (*.exe)", "*.exe"),
+                        ("All files (*.*)", "*.*"),
+                    ),
+                )
+            else:
+                path = filedialog.askdirectory(parent=root)
+            return path if path != "" else None
         else:
-            return self.window.create_file_dialog(webview.FOLDER_DIALOG)[0]
+            if params and params.get("type") == "cemu_dir":
+                result = self.window.create_file_dialog(
+                    webview.OPEN_DIALOG,
+                    file_types=(
+                        ("Executable (*.exe)",),
+                        ("All files (*.*)",),
+                    ),
+                    allow_multiple=False,
+                )
+            else:
+                result = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+            return result[0] if result else None
 
     def dir_exists(self, params):
         if not params["folder"]:
             return False
+        if params["type"] == "cemu_dir":
+            path = Path(params["folder"])
+            if path.is_file():
+                return path.suffix.lower() == ".exe"
+            return path.is_dir() and any("cemu" in f.name.lower() for f in path.glob("*.exe"))
         path = Path(params["folder"])
         real_folder = path.exists() and path.is_dir() and params["folder"] != ""
         if not real_folder:
             return False
-        if params["type"] == "cemu_dir":
-            return len(list(path.glob("?emu*.exe"))) > 0
         if "game_dir" in params["type"]:
             return (path / "Pack" / "Dungeon000.pack").exists()
         if params["type"] == "update_dir":
@@ -138,6 +148,8 @@ class Api:
     def parse_cemu_settings(self, params):
         try:
             cemu = Path(params["folder"])
+            if cemu.is_file():
+                cemu = cemu.parent
             set_path = cemu / "settings.xml"
             settings: minidom = util.parse_cemu_settings(set_path)
             game_dir: Optional[Path] = None
@@ -175,7 +187,7 @@ class Api:
                 "game_dir": str(game_dir),
                 "update_dir": str(update_dir) if update_dir else "",
                 "dlc_dir": str(dlc_dir) if dlc_dir else "",
-                "export_dir": str(cemu / "graphicPacks" / "BreathOfTheWild_BCML"),
+                "export_dir": str(cemu / "graphicPacks"),
             }
         except Exception as err:  # pylint: disable=broad-except
             print(err)
@@ -184,9 +196,14 @@ class Api:
     def get_settings(self, params=None):
         return util.get_settings()
 
-    @win_or_lose
-    def make_shortcut(self, params):
-        util.create_shortcuts(params["desktop"], not params["desktop"])
+    def guess_export_dir(self, params):
+        return str(
+            util.guess_export_dir_from_emu(
+                params["emu_path"],
+                params["wiiu"],
+                params.get("export_layout_nx", "atmosphere"),
+            )
+        )
 
     def get_user_langs(self, params):
         if params["dir"] and Path(params["dir"]).exists():
@@ -223,10 +240,16 @@ class Api:
             return {"exists": False, "message": "No old settings found."}
 
     def get_old_mods(self):
+        if not util.get_settings("wiiu") or util.get_settings("no_cemu"):
+            return 0
+        try:
+            cemu_dir = util.get_cemu_dir()
+        except FileNotFoundError:
+            return 0
         return len(
             {
                 d
-                for d in (util.get_cemu_dir() / "graphicPacks" / "BCML").glob("*")
+                for d in (cemu_dir / "graphicPacks" / "BCML").glob("*")
                 if d.is_dir()
             }
         )
@@ -283,8 +306,16 @@ class Api:
         }
 
     def get_setup(self):
+        has_emu = False
+        if not util.get_settings("no_cemu"):
+            try:
+                util.get_emu_executable()
+                has_emu = True
+            except FileNotFoundError:
+                has_emu = False
         return {
-            "hasCemu": not util.get_settings("no_cemu"),
+            "hasCemu": has_emu,
+            "firstRun": util.is_first_run(),
             "mergers": [m().friendly_name for m in mergers.get_mergers()],
         }
 
@@ -495,40 +526,35 @@ class Api:
 
     @win_or_lose
     def launch_game(self, params=None):
-        install.enable_bcml_gfx()
+        if util.get_settings("wiiu"):
+            install.enable_bcml_gfx()
         self.launch_cemu()
 
     @win_or_lose
     def launch_game_no_mod(self, params=None):
-        install.disable_bcml_gfx()
+        if util.get_settings("wiiu"):
+            install.disable_bcml_gfx()
         self.launch_cemu()
 
     @win_or_lose
     def launch_cemu(self, params=None):
         if not params:
             params = {"run_game": True}
-        cemu = next(
-            iter(
-                {
-                    f
-                    for f in util.get_cemu_dir().glob("*.exe")
-                    if "cemu" in f.name.lower()
-                }
-            )
-        )
-        uking = util.get_game_dir().parent / "code" / "U-King.rpx"
-        try:
-            assert uking.exists()
-        except AssertionError:
-            raise FileNotFoundError("Your BOTW executable could not be found")
+        emu = util.get_emu_executable()
         cemu_args: List[str]
+        if util.get_settings("wiiu") and params["run_game"]:
+            uking = util.get_game_dir().parent / "code" / "U-King.rpx"
+            try:
+                assert uking.exists()
+            except AssertionError:
+                raise FileNotFoundError("Your BOTW executable could not be found")
         if SYSTEM == "Windows":
-            cemu_args = [str(cemu)]
-            if params["run_game"]:
+            cemu_args = [str(emu)]
+            if util.get_settings("wiiu") and params["run_game"]:
                 cemu_args.extend(("-g", str(uking)))
         else:
-            cemu_args = ["wine", str(cemu)]
-            if params["run_game"]:
+            cemu_args = ["wine", str(emu)]
+            if util.get_settings("wiiu") and params["run_game"]:
                 cemu_args.extend(
                     (
                         "-g",
@@ -812,46 +838,6 @@ class Api:
     def open_help(self):
         help_thread = Thread(target=help_window, args=(self.host,))
         help_thread.start()
-
-    @win_or_lose
-    def update_bcml(self):
-        exe = str(util.get_python_exe(False))
-        args = [
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--no-warn-script-location",
-            "--upgrade",
-            "bcml",
-        ]
-        if DEBUG:
-            args.insert(-2, "--pre")
-        if SYSTEM == "Windows":
-            with NamedTemporaryFile("w", suffix=".bat", delete=False) as updater:
-                updater.write(
-                    "@echo off\n"
-                    'taskkill /fi "WINDOWTITLE eq BOTW Cross-Platform Mod Loader"\n'
-                    f"\"{exe}\" {' '.join(args)}\n"
-                    "echo Finished updating, will launch BCML in a moment!\n"
-                    "timeout 2 >nul 2>&1\n"
-                    f'start "" "{str(util.get_python_exe(True))}" -m bcml\n'
-                )
-                file = updater.name
-            os.system(f"timeout 2 >nul 2>&1 && start cmd /c {file}")
-        else:
-            with NamedTemporaryFile("w", suffix=".sh", delete=False) as updater:
-                updater.write(
-                    "#!/usr/bin/bash\n"
-                    "sleep 2\n"
-                    f"\"{exe}\" {' '.join(args)}\n"
-                    "echo Finished updating, will launch BCML in a moment!\n"
-                    f"{exe} -m bcml"
-                )
-                file = updater.name
-            Popen(["/bin/sh", file], start_new_session=True)
-        for win in webview.windows:
-            win.destroy()
 
     def restart(self):
         opener = Thread(target=start_new_instance)

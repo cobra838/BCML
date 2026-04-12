@@ -18,7 +18,6 @@ import Mods from "./Mods.jsx";
 import ProfileModal from "./Profile.jsx";
 import ProgressModal from "./Progress.jsx";
 import React from "react";
-import ReactMarkdown from "react-markdown";
 import SelectsDialog from "./Selects.jsx";
 import Settings from "./Settings.jsx";
 
@@ -27,8 +26,9 @@ const TABS = ["mod-list", "dev-tools", "settings"];
 class App extends React.Component {
     constructor() {
         super();
+        const firstStart = window.location.toString().includes("firststart");
         this.state = {
-            tab: "mod-list",
+            tab: firstStart ? "settings" : "mod-list",
             mods: [],
             modsLoaded: false,
             selects: null,
@@ -50,9 +50,6 @@ class App extends React.Component {
             confirmText: "",
             confirmCallback: () => {},
             showAbout: false,
-            update: false,
-            changelog: true,
-            showChangelog: false,
             version: "3.0"
         };
         this.selects = null;
@@ -84,6 +81,9 @@ class App extends React.Component {
     };
 
     componentDidMount = () => {
+        if (window.location.toString().includes("firststart")) {
+            window.history.replaceState({}, "", "/index.html");
+        }
         window.onMsg = msg => {
             this.setState({ progressStatus: msg });
         };
@@ -211,7 +211,7 @@ class App extends React.Component {
                         this.setState(
                             {
                                 showProgress: false,
-                                showDone: true,
+                                showDone: false,
                                 selects: {}
                             },
                             () => this.refreshMods()
@@ -251,7 +251,7 @@ class App extends React.Component {
                                 throw res.error;
                             }
                             this.setState(
-                                { showProgress: false, showDone: true },
+                                { showProgress: false, showDone: false },
                                 () => {
                                     this.backupRef.current.refreshBackups();
                                     if (operation == "restore") this.refreshMods();
@@ -293,7 +293,7 @@ class App extends React.Component {
                                 throw res.error;
                             }
                             this.setState(
-                                { showProgress: false, showDone: true },
+                                { showProgress: false, showDone: false },
                                 () => {
                                     this.profileRef.current.refreshProfiles();
                                     if (operation == "load") this.refreshMods();
@@ -322,7 +322,7 @@ class App extends React.Component {
                             throw res.error;
                         }
 
-                        this.setState({ showProgress: false, showDone: true }, () =>
+                        this.setState({ showProgress: false, showDone: false }, () =>
                             this.refreshMods()
                         );
                     })
@@ -343,7 +343,7 @@ class App extends React.Component {
                     .then(res => {
                         if (!res.success) throw res.error;
 
-                        this.setState({ showProgress: false, showDone: true });
+                        this.setState({ showProgress: false, showDone: false });
                     })
                     .catch(this.showError);
             }
@@ -375,16 +375,6 @@ class App extends React.Component {
             .catch(this.props.onError);
     };
 
-    updateBcml = () => {
-        this.confirm(
-            "Are you sure you want to update BCML? " +
-                "Updating will close the program, run the update, and attempt to lauch it again.",
-            () => {
-                pywebview.api.update_bcml();
-            }
-        );
-    };
-
     setProgress = (title, msg) => {
         this.setState({
             progressTitle: title,
@@ -394,7 +384,7 @@ class App extends React.Component {
     };
 
     setDone = () => {
-        this.setState({ showProgress: false, showDone: true });
+        this.setState({ showProgress: false, showDone: false });
     };
 
     render() {
@@ -411,9 +401,6 @@ class App extends React.Component {
                             <Dropdown.Item
                                 onClick={() => pywebview.api.save_mod_list()}>
                                 Save Mod List
-                            </Dropdown.Item>
-                            <Dropdown.Item onClick={this.updateBcml}>
-                                Update BCML
                             </Dropdown.Item>
                             <Dropdown.Item as="a" href="/index.html?firstrun">
                                 Run Setup Wizard
@@ -441,6 +428,7 @@ class App extends React.Component {
                         busy: this.state.showProgress,
                         settings: this.state.settings
                     }}>
+                    {this.state.tab && (
                     <Tabs
                         id="tabs"
                         mountOnEnter
@@ -461,7 +449,7 @@ class App extends React.Component {
                                 onDone={() =>
                                     this.setState({
                                         showProgress: false,
-                                        showDone: true
+                                        showDone: false
                                     })
                                 }
                                 onCancel={() => this.setState({ showProgress: false })}
@@ -477,7 +465,7 @@ class App extends React.Component {
                                 onDone={() =>
                                     this.setState({
                                         showProgress: false,
-                                        showDone: true
+                                        showDone: false
                                     })
                                 }
                             />
@@ -514,6 +502,7 @@ class App extends React.Component {
                             </Button>
                         </Tab>
                     </Tabs>
+                    )}
                 </ModContext.Provider>
                 <ProgressModal
                     show={this.state.showProgress}
@@ -535,14 +524,6 @@ class App extends React.Component {
                     show={this.state.showConfirm}
                     message={this.state.confirmText}
                     onClose={this.state.confirmCallback.bind(this)}
-                />
-                <UpdateDialog
-                    show={this.state.update}
-                    onClose={confirmed =>
-                        this.setState({ update: false }, () =>
-                            confirmed ? this.updateBcml() : null
-                        )
-                    }
                 />
                 <BackupModal
                     show={this.state.showBackups}
@@ -603,13 +584,6 @@ class App extends React.Component {
                         );
                     }}
                 />
-                {this.state.changelog && (
-                    <Changelog
-                        show={this.state.showChangelog}
-                        onClose={() => this.setState({ showChangelog: false })}
-                        version={this.state.version}
-                    />
-                )}
             </>
         );
     }
@@ -678,73 +652,5 @@ const ConfirmDialog = props => {
         </Modal>
     );
 };
-
-const UpdateDialog = props => {
-    return (
-        <Modal show={props.show}>
-            <Modal.Header>
-                <Modal.Title>Update Available</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-                There is a new update available for BCML. Would you like to install it?
-            </Modal.Body>
-            <Modal.Footer>
-                <Button onClick={() => props.onClose(true)}>OK</Button>
-                <Button variant="secondary" onClick={() => props.onClose(false)}>
-                    Close
-                </Button>
-            </Modal.Footer>
-        </Modal>
-    );
-};
-
-class Changelog extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            info: {}
-        };
-    }
-
-    componentDidUpdate = async prevProps => {
-        if (this.props.version != prevProps.version) {
-            try {
-                const releases = await (
-                    await fetch(
-                        "https://api.github.com/repos/NiceneNerd/BCML/releases?per_page=5"
-                    )
-                ).json();
-                console.log(releases);
-                const latest = releases.find(
-                    r => r.tag_name.substring(1, 7) == this.props.version.trim()
-                );
-                this.setState({
-                    info: latest
-                });
-            } catch (e) {}
-        }
-    };
-
-    render = () => {
-        return this.state.info?.body ? (
-            <Modal show={this.props.show}>
-                <Modal.Header closeButton>
-                    <Modal.Title>BCML Updated</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <p>
-                        BCML has been updated to {this.state.info?.tag_name}. Changelog:
-                    </p>
-                    <ReactMarkdown>{this.state.info?.body}</ReactMarkdown>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button onClick={() => this.props.onClose()}>OK</Button>
-                </Modal.Footer>
-            </Modal>
-        ) : (
-            <></>
-        );
-    };
-}
 
 export default App;
