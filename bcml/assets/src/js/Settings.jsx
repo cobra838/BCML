@@ -18,7 +18,7 @@ class Settings extends React.Component {
             export_dir_nx: "",
             export_method: "hard_link",
             export_layout: "with_named_folder",
-            export_layout_nx: "atmosphere",
+            export_layout_nx: "emulator",
             load_reverse: false,
             site_meta: "",
             no_guess: false,
@@ -61,7 +61,7 @@ class Settings extends React.Component {
                 type: "update_dir"
             }));
         const cemuValid =
-            (!this.state.wiiu && this.state.cemu_dir == "") ||
+            this.state.cemu_dir == "" ||
             this.state.no_cemu ||
             (await pywebview.api.dir_exists({
                 folder: this.state.cemu_dir,
@@ -105,7 +105,7 @@ class Settings extends React.Component {
                 settings.export_method ||
                 (settings.no_hardlinks ? "copy" : "hard_link"),
             export_layout: settings.export_layout || "with_named_folder",
-            export_layout_nx: settings.export_layout_nx || "atmosphere",
+            export_layout_nx: settings.export_layout_nx || "emulator",
             languages
         }, () =>
             this.setState({ loaded: true })
@@ -239,11 +239,7 @@ class Settings extends React.Component {
                                 disabled={this.state.wiiu && this.state.no_cemu}
                                 onChange={this.handleChange}
                                 placeholder='Tip: select an emulator .exe'
-                                isValid={
-                                    this.state.cemu_dir != "" ||
-                                    this.state.no_cemu ||
-                                    !this.state.wiiu
-                                }
+                                isValid={true}
                                 overlay={
                                     <Tooltip>
                                         {this.state.wiiu ? (
@@ -263,8 +259,7 @@ class Settings extends React.Component {
                                 }
                             />
                             <Form.Control.Feedback type="invalid">
-                                An emulator executable is required unless you check the
-                                no Cemu option
+                                The emulator executable path is not valid
                             </Form.Control.Feedback>
                         </Form.Group>
                     </Col>
@@ -685,11 +680,11 @@ class Settings extends React.Component {
                                     as="select"
                                     value={this.state.export_layout_nx}
                                     onChange={this.handleChange}>
-                                    <option value="atmosphere">
-                                        Atmosphere Layout
-                                    </option>
                                     <option value="emulator">
                                         Emulator Mod Layout
+                                    </option>
+                                    <option value="atmosphere">
+                                        Atmosphere Layout
                                     </option>
                                 </Form.Control>
                             </OverlayTrigger>

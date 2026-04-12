@@ -55,8 +55,8 @@ pub enum WiiuExportLayout {
 #[serde(rename_all = "snake_case")]
 pub enum SwitchExportLayout {
     #[default]
-    Atmosphere,
     Emulator,
+    Atmosphere,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]

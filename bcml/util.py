@@ -595,7 +595,7 @@ DEFAULT_SETTINGS = {
     "export_dir_nx": "",
     "export_method": "hard_link",
     "export_layout": "with_named_folder",
-    "export_layout_nx": "atmosphere",
+    "export_layout_nx": "emulator",
     "load_reverse": False,
     "site_meta": "",
     "dark_theme": False,
