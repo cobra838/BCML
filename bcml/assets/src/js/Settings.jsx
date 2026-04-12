@@ -237,9 +237,9 @@ class Settings extends React.Component {
                                                 For WiiU this
                                                 should usually
                                                 be <code>Cemu.exe</code>. BCML will use
-                                                the executable's parent folder for 
-                                                <code>settings.xml</code> and 
-                                                <code>graphicPacks</code>.
+                                                the executable's parent folder for
+                                                <code> settings.xml</code> and
+                                                <code> graphicPacks</code>.
                                             </>
                                         ) : (
                                             "Optional path to your Switch emulator executable. BCML will launch it without passing a game."
