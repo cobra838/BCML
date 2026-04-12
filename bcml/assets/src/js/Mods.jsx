@@ -61,7 +61,11 @@ class Mods extends React.Component {
                         this.handleRemerge("all");
                         break;
                     case "l":
-                        this.props.onLaunch();
+                        if (this.context.settings?.wiiu) {
+                            this.launchCemu();
+                        } else {
+                            this.props.onLaunch();
+                        }
                         break;
                     case "h":
                         this.setState({ showDisabled: !this.state.showDisabled });
@@ -540,17 +544,21 @@ class Mods extends React.Component {
                                         overlay={
                                             <Tooltip>
                                                 {this.context.settings?.wiiu
-                                                    ? "Launch Breath of the Wild (Ctrl+L)"
+                                                    ? "Launch EMU (Ctrl+L)"
                                                     : "Launch EMU (Ctrl+L)"}
                                             </Tooltip>
                                         }>
                                         <Button
                                             variant="primary"
                                             size="xs"
-                                            onClick={this.props.onLaunch}
+                                            onClick={
+                                                this.context.settings?.wiiu
+                                                    ? this.launchCemu
+                                                    : this.props.onLaunch
+                                            }
                                             title={
                                                 this.context.settings?.wiiu
-                                                    ? "Launch Breath of the Wild"
+                                                    ? "Launch EMU"
                                                     : "Launch EMU"
                                             }>
                                             <svg
@@ -594,11 +602,21 @@ class Mods extends React.Component {
                                         id="dropdown-split-basic"
                                     />
                                     <Dropdown.Menu>
-                                        <Dropdown.Item onClick={this.launchNoMod}>
-                                            {this.context.settings?.wiiu
-                                                ? "Launch without mods"
-                                                : "Launch EMU"}
-                                        </Dropdown.Item>
+                                        {this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.props.onLaunch}>
+                                                Launch Breath of the Wild
+                                            </Dropdown.Item>
+                                        )}
+                                        {this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.launchNoMod}>
+                                                Launch Breath of the Wild without mods
+                                            </Dropdown.Item>
+                                        )}
+                                        {!this.context.settings?.wiiu && (
+                                            <Dropdown.Item onClick={this.launchNoMod}>
+                                                Launch EMU
+                                            </Dropdown.Item>
+                                        )}
                                         {this.context.settings?.wiiu && (
                                             <Dropdown.Item onClick={this.launchCemu}>
                                                 Launch EMU without starting game
