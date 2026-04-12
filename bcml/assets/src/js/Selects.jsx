@@ -9,6 +9,7 @@ class SelectsDialog extends React.Component {
             folders: [],
             error: null
         };
+        this.formRef = React.createRef();
         this.handleChange = this.handleChange.bind(this);
     }
 
@@ -77,22 +78,31 @@ class SelectsDialog extends React.Component {
         }
     }
 
+    // get checked opt, not from options.json!!!!
+    getCheckedFolders = () => {
+        if (!this.formRef.current) {
+            return this.state.folders;
+        }
+        return Array.from(
+            this.formRef.current.querySelectorAll("input:checked")
+        ).map(input => input.value);
+    };
+
     submit = () => {
+        const folders = this.getCheckedFolders();
         if (
             this.props.mod.options.single
                 .filter(g => g.required)
                 .some(
-                    g =>
-                        document.querySelector(`input[name="${g.name}"]:checked`)
-                            ?.value == null
+                    g => !g.options.some(opt => folders.includes(opt.folder))
                 )
         ) {
             this.setState({
                 error: "One or more required options have not been selected."
             });
         } else {
-            this.setState({ error: null });
-            this.props.onSet(this.state.folders);
+            this.setState({ error: null, folders });
+            this.props.onSet(folders);
         }
     };
 
@@ -116,7 +126,7 @@ class SelectsDialog extends React.Component {
                         {this.props.mod && this.props.mod.name} has customization
                         options. Please select the options you would like to use below.
                     </p>
-                    <Form>
+                    <Form ref={this.formRef}>
                         {this.props.mod &&
                             this.props.mod.options.multi &&
                             Object.keys(this.props.mod.options.multi).length > 0 && (

@@ -173,8 +173,9 @@ class PackMerger(mergers.Merger):
                 if modded_sarc in diff:
                     if not modded_sarc in all_diffs:
                         all_diffs[modded_sarc] = []
-                    if (mod.path / modded_sarc).exists():
-                        all_diffs[modded_sarc].append(mod.path / modded_sarc)
+                    for source in [mod.path, *util.get_selected_options(mod)]:
+                        if (source / modded_sarc).exists():
+                            all_diffs[modded_sarc].append(source / modded_sarc)
         return all_diffs
 
     @util.timed
