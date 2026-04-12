@@ -8,14 +8,16 @@ class ModSelect extends React.Component {
         this.state = {
             selectedItems: [],
             mods: [],
-            justSorted: false
+            justSorted: false,
+            lastSelectedPriority: null
         };
     }
 
     componentDidMount() {
         this.setState({
             mods: this.props.mods,
-            selectedItems: [this.props.mods[0].priority]
+            selectedItems: [this.props.mods[0].priority],
+            lastSelectedPriority: this.props.mods[0].priority
         });
     }
 
@@ -23,7 +25,8 @@ class ModSelect extends React.Component {
         if (JSON.stringify(nextProps.mods) != JSON.stringify(prevState.mods)) {
             return {
                 mods: nextProps.mods,
-                selectedItems: [nextProps.mods[0].priority]
+                selectedItems: [nextProps.mods[0].priority],
+                lastSelectedPriority: nextProps.mods[0].priority
             };
         } else return null;
     }
@@ -58,20 +61,40 @@ class ModSelect extends React.Component {
     onItemSelect(e, mod) {
         e.persist();
         if (mod.path.startsWith("QUEUE")) return;
+        const visibleMods = this.state.mods.filter(
+            item => !item.path.startsWith("QUEUE") && (this.props.showDisabled || !item.disabled)
+        );
         let items;
-        if (!this.state.selectedItems.includes(mod.priority)) {
+        if (
+            e.shiftKey &&
+            this.state.lastSelectedPriority &&
+            visibleMods.some(item => item.priority === this.state.lastSelectedPriority)
+        ) {
+            const start = visibleMods.findIndex(
+                item => item.priority === this.state.lastSelectedPriority
+            );
+            const end = visibleMods.findIndex(item => item.priority === mod.priority);
+            const range = visibleMods
+                .slice(Math.min(start, end), Math.max(start, end) + 1)
+                .map(item => item.priority);
+            items = e.ctrlKey
+                ? [...new Set([...this.state.selectedItems, ...range])]
+                : range;
+        } else if (!this.state.selectedItems.includes(mod.priority)) {
             if (!e.ctrlKey) items = [mod.priority];
             else items = [mod.priority, ...this.state.selectedItems];
         } else {
             if (e.ctrlKey) {
-                items = this.state.selectedItems;
-                items.pop();
+                items = this.state.selectedItems.filter(
+                    priority => priority !== mod.priority
+                );
             } else {
                 items = [mod.priority];
             }
         }
         this.setState({
-            selectedItems: items
+            selectedItems: items,
+            lastSelectedPriority: mod.priority
         });
     }
 
@@ -82,7 +105,10 @@ class ModSelect extends React.Component {
                 selectedItems: !mod.path.startsWith("QUEUE")
                     ? [mod.priority]
                     : prevState.selectedItems,
-                justSorted: true
+                justSorted: true,
+                lastSelectedPriority: !mod.path.startsWith("QUEUE")
+                    ? mod.priority
+                    : prevState.lastSelectedPriority
             }),
             () => this.props.onChange(order.map(mod => JSON.parse(mod)))
         );
