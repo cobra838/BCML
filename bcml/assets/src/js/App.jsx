@@ -211,7 +211,7 @@ class App extends React.Component {
                         this.setState(
                             {
                                 showProgress: false,
-                                showDone: true,
+                                showDone: false,
                                 selects: {}
                             },
                             () => this.refreshMods()
@@ -251,7 +251,7 @@ class App extends React.Component {
                                 throw res.error;
                             }
                             this.setState(
-                                { showProgress: false, showDone: true },
+                                { showProgress: false, showDone: false },
                                 () => {
                                     this.backupRef.current.refreshBackups();
                                     if (operation == "restore") this.refreshMods();
@@ -293,7 +293,7 @@ class App extends React.Component {
                                 throw res.error;
                             }
                             this.setState(
-                                { showProgress: false, showDone: true },
+                                { showProgress: false, showDone: false },
                                 () => {
                                     this.profileRef.current.refreshProfiles();
                                     if (operation == "load") this.refreshMods();
@@ -322,7 +322,7 @@ class App extends React.Component {
                             throw res.error;
                         }
 
-                        this.setState({ showProgress: false, showDone: true }, () =>
+                        this.setState({ showProgress: false, showDone: false }, () =>
                             this.refreshMods()
                         );
                     })
@@ -343,7 +343,7 @@ class App extends React.Component {
                     .then(res => {
                         if (!res.success) throw res.error;
 
-                        this.setState({ showProgress: false, showDone: true });
+                        this.setState({ showProgress: false, showDone: false });
                     })
                     .catch(this.showError);
             }
@@ -384,7 +384,7 @@ class App extends React.Component {
     };
 
     setDone = () => {
-        this.setState({ showProgress: false, showDone: true });
+        this.setState({ showProgress: false, showDone: false });
     };
 
     render() {
@@ -449,7 +449,7 @@ class App extends React.Component {
                                 onDone={() =>
                                     this.setState({
                                         showProgress: false,
-                                        showDone: true
+                                        showDone: false
                                     })
                                 }
                                 onCancel={() => this.setState({ showProgress: false })}
@@ -465,7 +465,7 @@ class App extends React.Component {
                                 onDone={() =>
                                     this.setState({
                                         showProgress: false,
-                                        showDone: true
+                                        showDone: false
                                     })
                                 }
                             />
