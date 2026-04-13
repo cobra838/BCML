@@ -53,20 +53,19 @@ class SelectsDialog extends React.Component {
         }
     }
 
-    handleChange(e) {
+    handleChange(e, singleFolders = null) {
         e.persist();
         if (!e.currentTarget.checked) {
             this.setState({
                 folders: this.state.folders.filter(f => f != e.currentTarget.value)
             });
         } else {
-            if (e.currentTarget.type === "radio") {
-                const removals = Array.from(
-                    document.querySelectorAll(`[name="${e.currentTarget.name}"]`)
-                ).map(i => i.value);
+            if (singleFolders) {
                 this.setState({
                     folders: [
-                        ...this.state.folders.filter(f => !removals.includes(f)),
+                        ...this.state.folders.filter(
+                            f => !singleFolders.includes(f)
+                        ),
                         e.currentTarget.value
                     ]
                 });
@@ -186,14 +185,22 @@ class SelectsDialog extends React.Component {
                                                             </Tooltip>
                                                         }>
                                                         <Form.Check
-                                                            type="radio"
+                                                            type="checkbox"
                                                             name={s.name}
                                                             label={opt.name}
                                                             value={opt.folder}
                                                             checked={this.state.folders.includes(
                                                                 opt.folder
                                                             )}
-                                                            onChange={this.handleChange}
+                                                            onChange={e =>
+                                                                this.handleChange(
+                                                                    e,
+                                                                    s.options.map(
+                                                                        option =>
+                                                                            option.folder
+                                                                    )
+                                                                )
+                                                            }
                                                         />
                                                     </OverlayTrigger>
                                                 </Form.Group>
