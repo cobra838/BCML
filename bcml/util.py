@@ -369,20 +369,6 @@ class BcmlMod:
             r"(?u)[^-\w.]", "", self.name.strip().replace(" ", "")
         )
 
-
-def get_selected_options(mod: BcmlMod) -> List[Path]:
-    options_dir = mod.path / "options"
-    if not options_dir.exists():
-        return []
-    try:
-        options_meta = json.loads((mod.path / "options.json").read_text("utf-8"))
-    except (FileNotFoundError, json.decoder.JSONDecodeError):
-        return []
-    selects = options_meta.get("selects", [])
-    if not isinstance(selects, list):
-        return []
-    return [option for option in (options_dir / sel for sel in selects) if option.is_dir()]
-
     def _save_changes(self):
         self.info_path.write_text(
             json.dumps(self._info, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -447,6 +433,20 @@ def get_selected_options(mod: BcmlMod) -> List[Path]:
                     image_path = str(thumb)
             self._preview = self.path / image_path
         return self._preview
+
+
+def get_selected_options(mod: BcmlMod) -> List[Path]:
+    options_dir = mod.path / "options"
+    if not options_dir.exists():
+        return []
+    try:
+        options_meta = json.loads((mod.path / "options.json").read_text("utf-8"))
+    except (FileNotFoundError, json.decoder.JSONDecodeError):
+        return []
+    selects = options_meta.get("selects", [])
+    if not isinstance(selects, list):
+        return []
+    return [option for option in (options_dir / sel for sel in selects) if option.is_dir()]
 
 
 decompress = oead.yaz0.decompress

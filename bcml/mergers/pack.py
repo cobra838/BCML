@@ -147,6 +147,10 @@ class PackMerger(mergers.Merger):
                     (mod.path / "logs" / self._log_name).read_text(encoding="utf-8")
                 ).items()
             }
+        # Previously iterated all dirs in options/ (unordered set), which worked
+        # because old install only kept selected options there. Now all options are
+        # kept on disk, so get_selected_options() filters by selects in options.json:
+        # for opt in {d for d in (mod.path / "options").glob("*") if d.is_dir()}:
         for opt in util.get_selected_options(mod):
             if (opt / "logs" / self._log_name).exists():
                 diffs |= {
@@ -173,6 +177,11 @@ class PackMerger(mergers.Merger):
                 if modded_sarc in diff:
                     if not modded_sarc in all_diffs:
                         all_diffs[modded_sarc] = []
+                    # Check mod base dir and all selected option dirs.
+                    # Options are applied in selects order; later options have
+                    # higher priority for conflicting inner files. E.g. option "6"
+                    # (last) overrides option "1" (first) — intended for modular
+                    # mods where later options extend/override earlier ones.
                     for source in [mod.path, *util.get_selected_options(mod)]:
                         if (source / modded_sarc).exists():
                             all_diffs[modded_sarc].append(source / modded_sarc)
