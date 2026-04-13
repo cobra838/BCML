@@ -8,6 +8,7 @@ class Settings extends React.Component {
         super();
         this.state = {
             cemu_dir: "",
+            cemu_dir_nx: "",
             game_dir: "",
             game_dir_nx: "",
             update_dir: "",
@@ -39,6 +40,9 @@ class Settings extends React.Component {
         this.loadSettings = this.loadSettings.bind(this);
     }
 
+    getActiveEmuDir = (state = this.state) =>
+        state[state.wiiu ? "cemu_dir" : "cemu_dir_nx"];
+
     checkValid = async () => {
         const gameValid =
             !this.state.wiiu ||
@@ -59,10 +63,10 @@ class Settings extends React.Component {
                 type: "update_dir"
             }));
         const cemuValid =
-            this.state.cemu_dir == "" ||
+            this.getActiveEmuDir() == "" ||
             this.state.no_cemu ||
             (await pywebview.api.dir_exists({
-                folder: this.state.cemu_dir,
+                folder: this.getActiveEmuDir(),
                 type: "cemu_dir"
             }));
         const dlcValid =
@@ -99,6 +103,9 @@ class Settings extends React.Component {
         });
         this.setState({
             ...settings,
+            cemu_dir_nx:
+                settings.cemu_dir_nx ||
+                (!settings.wiiu ? settings.cemu_dir : ""),
             export_method:
                 settings.export_method ||
                 (settings.no_hardlinks ? "copy" : "hard_link"),
@@ -135,16 +142,22 @@ class Settings extends React.Component {
                 });
             }
         } else {
-            if (prevState.cemu_dir != this.state.cemu_dir) {
+            const prevActiveEmuDir = this.getActiveEmuDir(prevState);
+            const activeEmuDir = this.getActiveEmuDir();
+            if (
+                this.state.wiiu &&
+                (prevState.wiiu != this.state.wiiu ||
+                    prevActiveEmuDir != activeEmuDir)
+            ) {
                 if (
                     await pywebview.api.dir_exists({
-                        folder: this.state.cemu_dir,
+                        folder: activeEmuDir,
                         type: "cemu_dir"
                     })
                 ) {
                     this.setState({
                         ...(await pywebview.api.parse_cemu_settings({
-                            folder: this.state.cemu_dir
+                            folder: activeEmuDir
                         }))
                     });
                 }
@@ -186,6 +199,12 @@ class Settings extends React.Component {
         try {
             e.persist();
         } catch (error) {}
+        if (e.target.id == "cemu_dir") {
+            this.setState({
+                [this.state.wiiu ? "cemu_dir" : "cemu_dir_nx"]: e.target.value
+            });
+            return;
+        }
         this.setState({
             [e.target.id]:
                 e.target.type != "checkbox" ? e.target.value : e.target.checked
@@ -195,7 +214,7 @@ class Settings extends React.Component {
     autoFillExportDir = async () => {
         try {
             const exportDir = await pywebview.api.guess_export_dir({
-                emu_path: this.state.cemu_dir,
+                emu_path: this.getActiveEmuDir(),
                 wiiu: this.state.wiiu,
                 export_layout_nx: this.state.export_layout_nx
             });
@@ -223,7 +242,7 @@ class Settings extends React.Component {
                         <Form.Group controlId="cemu_dir">
                             <Form.Label>EMU Executable</Form.Label>
                             <FolderInput
-                                value={this.state.cemu_dir}
+                                value={this.getActiveEmuDir()}
                                 disabled={this.state.wiiu && this.state.no_cemu}
                                 onChange={this.handleChange}
                                 placeholder='Tip: select an emulator .exe'
@@ -469,7 +488,7 @@ class Settings extends React.Component {
                                 <Button
                                     size="sm"
                                     variant="outline-secondary"
-                                    disabled={!this.state.cemu_dir}
+                                    disabled={!this.getActiveEmuDir()}
                                     onClick={this.autoFillExportDir}>
                                     Use EMU Executable
                                 </Button>
@@ -497,7 +516,7 @@ class Settings extends React.Component {
                                 <Button
                                     size="sm"
                                     variant="outline-secondary"
-                                    disabled={!this.state.cemu_dir}
+                                    disabled={!this.getActiveEmuDir()}
                                     onClick={this.autoFillExportDir}>
                                     Use EMU Executable
                                 </Button>

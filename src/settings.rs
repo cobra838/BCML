@@ -76,6 +76,8 @@ pub struct Settings {
     #[serde(default)]
     pub cemu_dir: PathBuf,
     #[serde(default)]
+    pub cemu_dir_nx: PathBuf,
+    #[serde(default)]
     pub game_dir: PathBuf,
     #[serde(default)]
     pub game_dir_nx: PathBuf,
@@ -148,6 +150,7 @@ impl Default for Settings {
             wiiu: true,
             auto_gb: true,
             cemu_dir: Default::default(),
+            cemu_dir_nx: Default::default(),
             dark_theme: Default::default(),
             dlc_dir: Default::default(),
             dlc_dir_nx: Default::default(),

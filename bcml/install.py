@@ -405,7 +405,11 @@ def install_mod(
                 if existing_mod.priority >= priority:
                     existing_mod.change_priority(existing_mod.priority + 1)
 
-        if (tmp_dir / "patches").exists() and not util.get_settings("no_cemu"):
+        if (
+            (tmp_dir / "patches").exists()
+            and util.get_settings("wiiu")
+            and not util.get_settings("no_cemu")
+        ):
             patch_dir = (
                 util.get_cemu_dir()
                 / "graphicPacks"
@@ -542,7 +546,7 @@ def uninstall_mod(mod: BcmlMod, wait_merge: bool = False):
         if not wait_merge:
             refresh_merges()
 
-    if has_patches and not util.get_settings("no_cemu"):
+    if has_patches and util.get_settings("wiiu") and not util.get_settings("no_cemu"):
         shutil.rmtree(
             util.get_cemu_dir()
             / "graphicPacks"

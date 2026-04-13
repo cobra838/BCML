@@ -108,8 +108,12 @@ class Api:
         if params["type"] == "cemu_dir":
             path = Path(params["folder"])
             if path.is_file():
-                return path.suffix.lower() == ".exe"
-            return path.is_dir() and any("cemu" in f.name.lower() for f in path.glob("*.exe"))
+                return True
+            return (
+                util.get_settings("wiiu")
+                and path.is_dir()
+                and any("cemu" in f.name.lower() for f in path.glob("*.exe"))
+            )
         path = Path(params["folder"])
         real_folder = path.exists() and path.is_dir() and params["folder"] != ""
         if not real_folder:
@@ -274,6 +278,8 @@ class Api:
 
     @win_or_lose
     def delete_old_mods(self):
+        if not util.get_settings("wiiu"):
+            return
         rmtree(util.get_cemu_dir() / "graphicPacks" / "BCML")
 
     @win_or_lose
@@ -496,7 +502,7 @@ class Api:
     def uninstall_all(self):
         for folder in {d for d in util.get_modpack_dir().glob("*") if d.is_dir()}:
             rmtree(folder, onerror=install.force_del)
-        if not util.get_settings("no_cemu"):
+        if util.get_settings("wiiu") and not util.get_settings("no_cemu"):
             shutil.rmtree(
                 util.get_cemu_dir() / "graphicPacks" / "bcmlPatches", ignore_errors=True
             )
@@ -632,6 +638,8 @@ class Api:
     @win_or_lose
     @install.refresher
     def restore_old_backup(self, params=None):
+        if not util.get_settings("wiiu"):
+            return
         if (util.get_cemu_dir() / "bcml_backups").exists():
             open_dir = util.get_cemu_dir() / "bcml_backups"
         else:

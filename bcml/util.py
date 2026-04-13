@@ -599,6 +599,7 @@ def clear_temp_dir():
 
 DEFAULT_SETTINGS = {
     "cemu_dir": "",
+    "cemu_dir_nx": "",
     "game_dir": "",
     "game_dir_nx": "",
     "update_dir": "",
@@ -644,6 +645,10 @@ def get_settings(name: str = "") -> Any:
                 for k, v in DEFAULT_SETTINGS.items():
                     if k not in settings:
                         settings[k] = v
+                if "cemu_dir_nx" not in settings:
+                    settings["cemu_dir_nx"] = (
+                        settings["cemu_dir"] if not settings.get("wiiu", True) else ""
+                    )
                 if settings["store_dir"] == "" or not settings["store_dir"]:
                     settings["store_dir"] = (
                         "bcml-data" if get_is_portable_mode() else str(get_data_dir())
@@ -658,7 +663,12 @@ def get_settings(name: str = "") -> Any:
                     and Path(settings["export_dir"]).name.lower() == "breathofthewild_bcml"
                 ):
                     settings["export_dir"] = str(Path(settings["export_dir"]).parent)
-                if settings["cemu_dir"] and not settings["no_cemu"] and not settings["export_dir"]:
+                if (
+                    settings.get("wiiu", True)
+                    and settings["cemu_dir"]
+                    and not settings["no_cemu"]
+                    and not settings["export_dir"]
+                ):
                     emu_path = Path(settings["cemu_dir"])
                     settings["export_dir"] = str(
                         (emu_path.parent if emu_path.suffix.lower() == ".exe" else emu_path)
@@ -682,7 +692,9 @@ def save_settings():
 
 
 def get_emu_executable() -> Path:
-    emu_path = str(get_settings("cemu_dir"))
+    is_wiiu = get_settings("wiiu")
+    emu_setting = "cemu_dir" if is_wiiu else "cemu_dir_nx"
+    emu_path = str(get_settings(emu_setting))
     if not emu_path:
         raise FileNotFoundError(
             "The emulator executable has moved or not been saved yet."
@@ -691,6 +703,10 @@ def get_emu_executable() -> Path:
     if path.is_file():
         return path
     if path.is_dir():
+        if not is_wiiu:
+            raise FileNotFoundError(
+                "The emulator executable could not be found in the selected folder."
+            )
         for exe in sorted(path.glob("*.exe")):
             if "cemu" in exe.name.lower():
                 return exe
@@ -750,7 +766,9 @@ def get_cemu_dir() -> Path:
 
 def set_cemu_dir(path: Path):
     settings = get_settings()
-    settings["cemu_dir"] = str(path.resolve())
+    settings["cemu_dir" if settings.get("wiiu", True) else "cemu_dir_nx"] = str(
+        path.resolve()
+    )
     save_settings()
 
 
