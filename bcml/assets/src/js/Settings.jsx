@@ -243,7 +243,7 @@ class Settings extends React.Component {
                             <Form.Label>EMU Executable</Form.Label>
                             <FolderInput
                                 value={this.getActiveEmuDir()}
-                                disabled={this.state.wiiu && this.state.no_cemu}
+                                disabled={this.state.no_cemu}
                                 onChange={this.handleChange}
                                 placeholder='Tip: select an emulator .exe'
                                 isValid={true}

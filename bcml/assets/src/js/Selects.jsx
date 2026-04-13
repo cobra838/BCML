@@ -132,11 +132,12 @@ class SelectsDialog extends React.Component {
                                 <>
                                     <h5>Multiple Choice Options</h5>
                                     {this.props.mod.options.multi.map(m => (
-                                        <Form.Group key={m.folder}>
+                                        <Form.Group controlId={m.folder} key={m.folder}>
                                             <OverlayTrigger
                                                 overlay={
                                                     <Tooltip>
                                                         {m.desc || "No description"}
+                                                        <br /><code>{m.folder}</code>
                                                     </Tooltip>
                                                 }>
                                                 <Form.Check
@@ -182,6 +183,7 @@ class SelectsDialog extends React.Component {
                                                             <Tooltip>
                                                                 {opt.desc ||
                                                                     "No description"}
+                                                                <br /><code>{opt.folder}</code>
                                                             </Tooltip>
                                                         }>
                                                         <Form.Check
