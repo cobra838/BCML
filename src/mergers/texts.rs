@@ -149,10 +149,14 @@ pub fn merge_language(
                     stock_text.entries.extend(diff.into_iter());
                     Ok((file, stock_text.into_msbt_bytes(endian)?))
                 } else {
+                    let has_attributes = diff.values().any(|entry| entry.attributes.is_some());
                     let text = Msyt {
                         msbt: msyt::model::MsbtInfo {
                             group_count: diff.len() as u32,
-                            atr1_unknown: Some(if file.contains("EventFlowMsg") { 0 } else { 4 }),
+                            // For newly-created MSBTs, BOTW expects string-style ATR1 data when
+                            // attributes are present. Writing `0` here causes BCML/msyt to emit an
+                            // ATR1 blob that downstream tools report as `additionalAttributeData`.
+                            atr1_unknown: has_attributes.then_some(4),
                             ato1: None,
                             tsy1: None,
                             nli1: None,
