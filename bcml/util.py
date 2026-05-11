@@ -741,10 +741,10 @@ def guess_export_dir_from_emu(
         if family == "ryujinx":
             if export_layout_nx == "emulator":
                 return root / "mods" / "contents"
-            return root / "sdcard" / "atmosphere" / "contents"
+            return root / "portable" / "sdcard" / "atmosphere" / "contents"
         if export_layout_nx == "emulator":
             return root / "user" / "load"
-        return root / "sdmc" / "atmosphere" / "contents"
+        return root / "user" / "sdmc" / "atmosphere" / "contents"
     if "ryujinx" in emu_key:
         portable_root = base_dir / "portable"
         if portable_root.exists():

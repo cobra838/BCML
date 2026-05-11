@@ -102,51 +102,108 @@ to launch BCML in the future
 
 Building from source requires, in addition to the general prerequisites:
 
--   Python 3.7 - 3.10 64 bit
+-   Python 3.9 64 bit
 
--   Rust 1.60+ (nightly)
+-   Rust 1.71 (nightly)
 
 -   Node.js v14+
 
--   mkdocs and mkdocs-material
+Tested versions:
 
-    Run `pip install mkdocs mkdocs-material` in venv if not using `bootstrap.sh`
+```bash
+rustc --version
+# rustc 1.71.0-nightly (39c6804b9 2023-04-19)
 
-Steps to build from source:
+node --version
+# v24.13.1
+```
 
-1. Create and activate a Python virtual environment (venv)
+## Python Dependencies
 
-    1. Open terminal to repo root folder
-    2. `python -m venv venv`
-    3. Activate the venv (usually `venv/bin/activate` on Linux or `venv\Scripts\activate.ps1` on Windows)
+```bash
+pip install -r requirements.txt
+python.exe -m pip install --force-reinstall \
+    pip \
+    wheel \
+    setuptools \
+    pyinstaller \
+    mkdocs \
+    mkdocs-material \
+    "maturin>=0.12,<0.13"
+```
 
-2. Install Python requirements
+Tested versions:
 
-    1. Open terminal to repo root folder
-    2. Run `pip install -r requirements.txt`
-    3. Also install Maturin: `pip install maturin`
+wheel 0.46.3  
+setuptools 82.0.1  
+pyinstaller 6.20.0
+mkdocs 1.6.1  
+mkdocs-material 9.7.6
+maturin 0.12.20  
 
-3. Build Rust extension module
 
-    1. Open terminal to repo root folder
-    2. Run `maturin develop` (or `maturin develop --release` for performance)
+## Development Build
 
-4. Prepare the webpack bundle
+This validates Rust code, rebuilds frontend assets, rebuilds the Rust Python extension, reinstalls the wheel, and packages BCML using PyInstaller.
 
-    1. Open terminal to `bcml/assets`
-    2. Run `npm install`
-    3. Run `npm run build` (or `npm run test` to watch while editing)
+```bash
+set -e
+rm -f Cargo.lock
+rustc --version
+rustup show active-toolchain
+cargo --version
+cargo check
+cd bcml/assets
+npm run build
+cd ../..
+py -3.9 -m mkdocs build -d ./bcml/assets/help
+maturin build --release --interpreter python
+wheel="$(ls -t ./target/wheels/*.whl | head -n 1)"
+py -3.9 -m pip install --force-reinstall "$wheel"
+PYD_PATH=$(py -3.9 -c "import sysconfig; print(sysconfig.get_paths()['purelib'] + r'/bcml/bcml.cp39-win_amd64.pyd')")
+py -3.9 -m PyInstaller --onedir --windowed --name BCML \
+  --distpath "./0dist" \
+  --workpath "./build/pyinstaller" \
+  --collect-all bcml \
+  --collect-all aamp \
+  --collect-all byml \
+  --collect-all botw_utils \
+  --collect-all rstb \
+  --icon "bcml/data/bcml.ico" \
+  --add-binary "$PYD_PATH;bcml" \
+  bcml/__main__.py
+```
 
-5. Build the docs
+## Quick Rebuild
 
-    1. Open terminal to repo root folder
-    2. Run `mkdocs build`
+Use this after dependencies are already installed.
 
-6. Create an installable wheel with `maturin build` or run without installing with
-   `python -m bcml`
-
-Note that on Linux, you can simply run `bootstrap.sh` to perform these steps
-automatically unless you would like more control.
+```bash
+set -e
+rm -f Cargo.lock
+rustc --version
+rustup show active-toolchain
+cargo --version
+cargo check
+cd bcml/assets
+npm run build
+cd ../..
+maturin build --release --interpreter python
+wheel="$(ls -t ./target/wheels/*.whl | head -n 1)"
+py -3.9 -m pip install --force-reinstall "$wheel"
+PYD_PATH=$(py -3.9 -c "import sysconfig; print(sysconfig.get_paths()['purelib'] + r'/bcml/bcml.cp39-win_amd64.pyd')")
+py -3.9 -m PyInstaller --onedir --windowed --name BCML \
+  --distpath "./0dist" \
+  --workpath "./build/pyinstaller" \
+  --collect-all bcml \
+  --collect-all aamp \
+  --collect-all byml \
+  --collect-all botw_utils \
+  --collect-all rstb \
+  --icon "bcml/data/bcml.ico" \
+  --add-binary "$PYD_PATH;bcml" \
+  bcml/__main__.py
+```
 
 ## Usage and Troubleshooting
 
