@@ -1,6 +1,7 @@
 import base64
 import csv
 import json
+import struct
 import shutil
 from configparser import ConfigParser
 from multiprocessing import Pool
@@ -12,11 +13,55 @@ import yaml
 from aamp import yaml_util as ayu
 from aamp import ParameterIO, ParameterObject, ParameterList, Writer
 from byml import yaml_util as byu
-from bcml import util, install
+from bcml import util, install, bcml as rsext
 
 # from bcml.mergers.texts import read_msbt
-from bcml.mergers.rstable import RstbMerger
-from bcml.util import RulesParser
+from bcml.mergers.rstable import RstbMerger, get_stock_rstb
+from bcml.util import RulesParser, TempSettingsContext
+
+WIIU_TITLE_IDS = {"00050000101C9300", "00050000101C9400", "00050000101C9500"}
+SWITCH_TITLE_IDS = {"01007EF00011E000", "01007EF00011F001"}
+
+
+def detect_old_mod_platform(mod_dir: Path, rules_path: Path = None) -> str:
+    switch_paths = {
+        "01007EF00011E000",
+        "01007EF00011F001",
+        "01007ef00011e000",
+        "01007ef00011f001",
+        "base",
+        "dlc",
+    }
+    wiiu_paths = {"content", "aoc", "Content", "Aoc"}
+    if any((mod_dir / path).exists() for path in switch_paths):
+        return "switch"
+    if any((mod_dir / path).exists() for path in wiiu_paths):
+        return "wiiu"
+
+    probe_files = [
+        mod_dir / "logs" / "packs.log",
+        mod_dir / "logs" / "rstb.log",
+    ]
+    for probe in probe_files:
+        if not probe.exists():
+            continue
+        text = probe.read_text(encoding="utf-8", errors="ignore")
+        if "01007EF00011E000/romfs" in text or "01007EF00011F001/romfs" in text:
+            return "switch"
+        if "content/" in text or "content\\" in text or "aoc/" in text or "aoc\\" in text:
+            return "wiiu"
+
+    if rules_path and rules_path.exists():
+        rules = RulesParser()
+        rules.read(str(rules_path))
+        raw_ids = str(rules["Definition"].get("titleIds", ""))
+        title_ids = {title_id.strip() for title_id in raw_ids.split(",") if title_id.strip()}
+        if title_ids & SWITCH_TITLE_IDS:
+            return "switch"
+        if title_ids & WIIU_TITLE_IDS:
+            return "wiiu"
+
+    return "wiiu" if util.get_settings("wiiu") else "switch"
 
 
 def convert_old_mods(source: Path = None):
@@ -43,9 +88,11 @@ def convert_old_mods(source: Path = None):
 
 
 def convert_old_mod(mod: Path, delete_old: bool = False):
-    rules_to_info(mod / "rules.txt", delete_old=delete_old)
+    platform = detect_old_mod_platform(mod, mod / "rules.txt")
+    rules_to_info(mod / "rules.txt", platform=platform, delete_old=delete_old)
     if (mod / "logs").exists():
-        convert_old_logs(mod)
+        with TempSettingsContext({"wiiu": platform == "wiiu"}):
+            convert_old_logs(mod)
 
 
 def convert_old_settings():
@@ -76,7 +123,7 @@ def convert_old_settings():
     util.save_settings()
 
 
-def parse_rules(rules_path: Path) -> Dict[str, Any]:
+def parse_rules(rules_path: Path, platform: str = "wiiu") -> Dict[str, Any]:
     rules = RulesParser()
     rules.read(str(rules_path))
     info = {
@@ -87,7 +134,7 @@ def parse_rules(rules_path: Path) -> Dict[str, Any]:
         "version": "1.0.0",
         "depends": [],
         "options": {},
-        "platform": "wiiu",
+        "platform": platform,
         "priority": 100,
     }
     id_string = f"{info['name']}=={info['version']}"
@@ -99,9 +146,11 @@ def parse_rules(rules_path: Path) -> Dict[str, Any]:
     return info
 
 
-def rules_to_info(rules_path: Path, delete_old: bool = False):
+def rules_to_info(
+    rules_path: Path, platform: str = "wiiu", delete_old: bool = False
+):
     print("Converting meta file...")
-    info = parse_rules(rules_path)
+    info = parse_rules(rules_path, platform=platform)
     (rules_path.parent / "info.json").write_text(
         json.dumps(info, ensure_ascii=False, indent=2)
     )
@@ -117,7 +166,9 @@ def convert_old_logs(mod_dir: Path):
     if (mod_dir / "logs" / "rstb.log").exists():
         print("Upgrading RSTB log...")
         _convert_rstb_log(mod_dir)
-    if (mod_dir / "logs").glob("*texts*"):
+    if any((mod_dir / "logs").glob("texts_*.yml")) or any(
+        (mod_dir / "logs").glob("newtexts_*.sarc")
+    ):
         print("Upgrading text logs...")
         _convert_text_logs(mod_dir / "logs")
     for log in {l for l in mod_dir.glob("logs/*.yml") if not "texts" in l.stem}:
@@ -138,12 +189,51 @@ def convert_old_logs(mod_dir: Path):
 
 
 def _convert_rstb_log(mod: Path):
-    (mod / "logs" / "rstb.log").unlink()
-    with util.start_pool() as pool:
-        files = install.find_modded_files(mod, pool=pool)
-        merger = RstbMerger()
-        merger.set_pool(pool)
-        merger.log_diff(mod, files)
+    rstb_log = mod / "logs" / "rstb.log"
+    rstb_json = mod / "logs" / "rstb.json"
+    base_diff = {}
+    merger = RstbMerger()
+    merger._table = get_stock_rstb()
+    with rstb_log.open("r", encoding="utf-8", newline="") as rlog:
+        reader = csv.DictReader(rlog)
+        if reader.fieldnames and "rstb" in reader.fieldnames:
+            for row in reader:
+                name = str(row.get("name", "")).strip()
+                if not name:
+                    raw_path = str(row.get("path", "")).strip().replace("\\", "/")
+                    name = raw_path.split("//", 1)[-1].replace(".s", ".")
+                try:
+                    size = int(str(row.get("rstb", "")).strip())
+                except ValueError:
+                    continue
+                if name and not merger.should_exclude(name, size):
+                    base_diff[name] = size
+    if base_diff:
+        rstb_json.write_text(
+            json.dumps(base_diff, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+    try:
+        with util.start_pool() as pool:
+            files = install.find_modded_files(mod, pool=pool)
+            merger = RstbMerger()
+            merger.set_pool(pool)
+            merger.log_diff(mod, files)
+    except Exception:
+        if not base_diff:
+            raise
+    if base_diff and rstb_json.exists():
+        recalc_diff = json.loads(rstb_json.read_text(encoding="utf-8"))
+        rstb_json.write_text(
+            json.dumps(
+                {**base_diff, **recalc_diff},
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+    rstb_log.unlink()
 
 
 def _convert_pack_log(mod: Path):
@@ -188,6 +278,155 @@ def _convert_text_log(log: Path) -> dict:
     return {lang: {file: data[file]["entries"] for file in data}}
 
 
+def _read_msbt_py(data: bytes) -> dict:
+    bom = data[8:10]
+    endian = ">" if bom == b"\xfe\xff" else "<"
+
+    def u16(offset: int) -> int:
+        return struct.unpack_from(endian + "H", data, offset)[0]
+
+    def u32(offset: int) -> int:
+        return struct.unpack_from(endian + "I", data, offset)[0]
+
+    def read_utf16z(start: int, limit: int) -> str:
+        chars = []
+        pos = start
+        while pos + 1 < limit:
+            val = u16(pos)
+            pos += 2
+            if val == 0:
+                break
+            chars.append(chr(val))
+        return "".join(chars)
+
+    labels = {}
+    lbl1 = data.index(b"LBL1")
+    group_count = u32(lbl1 + 0x10)
+    for i in range(group_count):
+        count = u32(lbl1 + 0x14 + i * 8)
+        offset = u32(lbl1 + 0x18 + i * 8)
+        pos = lbl1 + 0x10 + offset
+        for _ in range(count):
+            size = data[pos]
+            pos += 1
+            label = data[pos : pos + size].decode("utf-8")
+            pos += size
+            labels[u32(pos)] = label
+            pos += 4
+
+    attributes = {}
+    if b"ATR1" in data:
+        atr1 = data.index(b"ATR1")
+        attr_count = u32(atr1 + 0x10)
+        attr_base = atr1 + 0x10
+        attr_end = atr1 + 0x10 + u32(atr1 + 4)
+        for i in range(attr_count):
+            offset = u32(atr1 + 0x18 + i * 4)
+            attributes[i] = read_utf16z(attr_base + offset, attr_end)
+
+    def flush_text(chars, contents):
+        if chars:
+            text = "".join(chars)
+            contents.append({"text": text})
+            chars.clear()
+
+    def parse_contents(raw: bytes) -> list:
+        contents = []
+        chars = []
+        pos = 0
+        while pos + 1 < len(raw):
+            val = struct.unpack_from(endian + "H", raw, pos)[0]
+            pos += 2
+            if val == 0:
+                break
+            if val != 0x000E:
+                chars.append(chr(val))
+                continue
+
+            flush_text(chars, contents)
+            kind = struct.unpack_from(endian + "H", raw, pos)[0]
+            pos += 2
+            if kind == 1 and pos + 3 < len(raw):
+                length = struct.unpack_from(endian + "H", raw, pos)[0]
+                unknown = struct.unpack_from(endian + "H", raw, pos + 2)[0]
+                pos += 4
+                words = []
+                for _ in range(length):
+                    if pos + 1 >= len(raw):
+                        break
+                    words.append(struct.unpack_from(endian + "H", raw, pos)[0])
+                    pos += 2
+                contents.append(
+                    {
+                        "control": {
+                            "kind": "choice",
+                            "choice_labels": words[:-2] if len(words) >= 2 else [],
+                            "selected_index": words[-1] if len(words) >= 1 else 0,
+                            "cancel_index": words[-2] if len(words) >= 2 else 0,
+                            "unknown": unknown,
+                        }
+                    }
+                )
+            elif kind == 2 and pos + 5 < len(raw):
+                variable_kind = struct.unpack_from(endian + "H", raw, pos)[0]
+                pos += 6
+                name_chars = []
+                while pos + 1 < len(raw):
+                    ch = struct.unpack_from(endian + "H", raw, pos)[0]
+                    pos += 2
+                    if ch == 0:
+                        break
+                    name_chars.append(chr(ch))
+                contents.append(
+                    {
+                        "control": {
+                            "kind": "variable",
+                            "variable_kind": variable_kind,
+                            "name": "".join(name_chars),
+                        }
+                    }
+                )
+            elif kind == 3 and pos + 5 < len(raw):
+                pos += 4
+                packed = struct.unpack_from(endian + "H", raw, pos)[0]
+                pos += 2
+                contents.append(
+                    {
+                        "control": {
+                            "kind": "sound",
+                            "unknown": [packed >> 8, packed & 0xFF],
+                        }
+                    }
+                )
+            else:
+                break
+        flush_text(chars, contents)
+        return contents
+
+    txt2 = data.index(b"TXT2")
+    txt_count = u32(txt2 + 0x10)
+    txt_base = txt2 + 0x10
+    txt_end = txt2 + 0x10 + u32(txt2 + 4)
+    offsets = [u32(txt2 + 0x14 + i * 4) for i in range(txt_count)]
+    entries = {}
+    for i, offset in enumerate(offsets):
+        start = txt_base + offset
+        end = txt_base + (
+            offsets[i + 1] if i + 1 < len(offsets) else (txt_end - txt_base)
+        )
+        entries[labels.get(i, str(i))] = {
+            "attributes": attributes.get(i, ""),
+            "contents": parse_contents(data[start:end]),
+        }
+    return {"entries": entries}
+
+
+def _read_msbt(data: bytes) -> dict:
+    if hasattr(rsext.mergers.texts, "read_msbt"):
+        return rsext.mergers.texts.read_msbt(data)
+    return _read_msbt_py(data)
+
+
 def _convert_text_logs(logs_path: Path):
     diffs = {}
     with util.start_pool() as pool:
@@ -203,7 +442,13 @@ def _convert_text_logs(logs_path: Path):
             if lang not in diffs:
                 diffs[lang] = {}
             try:
-                diffs[lang].update({file.name: read_msbt(bytes(file.data))["entries"]})
+                diffs[lang].update(
+                    {
+                        file.name.replace(".msbt", ".msyt"): (
+                            _read_msbt(bytes(file.data))["entries"]
+                        )
+                    }
+                )
             except RuntimeError:
                 print(
                     f"Warning: {file.name} could not be processed and will not be used"
@@ -212,9 +457,10 @@ def _convert_text_logs(logs_path: Path):
                 continue
         util.vprint(f"{len(fails)} text files failed to process:\n{fails}")
         text_pack.unlink()
-    (logs_path / "texts.json").write_text(
-        json.dumps(diffs, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    if diffs:
+        (logs_path / "texts.json").write_text(
+            json.dumps(diffs, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
 
 def _convert_gamedata_log(log: Path):
