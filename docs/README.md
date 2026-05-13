@@ -98,7 +98,13 @@ to launch BCML in the future
 
 * If your mods still don't load, verify that ~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML/rules.txt exist and try 'disable links for master mod' in BCML settings
 
-### Building from Source
+## Install from wheel
+
+```
+py -3.9 -m pip install --force-reinstall "https://raw.githubusercontent.com/cobra838/BCML/master/target/wheels/bcml-3.10.8-cp39-none-win_amd64.whl"
+```
+
+## Building from Source
 
 Building from source requires, in addition to the general prerequisites:
 
@@ -118,7 +124,7 @@ node --version
 # v24.13.1
 ```
 
-## Python Dependencies
+### Python Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -142,7 +148,7 @@ mkdocs-material 9.7.6
 maturin 0.12.20  
 
 
-## Development Build
+### Development Build
 
 This validates Rust code, rebuilds frontend assets, rebuilds the Rust Python extension, reinstalls the wheel, and packages BCML using PyInstaller.
 
@@ -174,7 +180,7 @@ py -3.9 -m PyInstaller --onedir --windowed --name BCML \
   bcml/__main__.py
 ```
 
-## Quick Rebuild
+### Quick Rebuild
 
 Use this after dependencies are already installed.
 

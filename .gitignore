@@ -94,7 +94,11 @@ instance/
 docs/_build/
 
 # PyBuilder
-target/
+target/*
+!target/wheels/
+target/wheels/*
+!target/wheels/bcml-3.10.8-cp39-none-win_amd64.whl
+
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -211,6 +215,5 @@ Cargo.lock
 #
 # already existing elements were commented out
 
-/target
 #Cargo.lock
 /.xwin-cache
