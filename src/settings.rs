@@ -177,6 +177,20 @@ impl Default for Settings {
 }
 
 impl Settings {
+    fn load_from(path: &Path) -> Result<Self> {
+        if path.exists() {
+            let text = fs::read_to_string(path)?;
+            let mut settings: Settings =
+                serde_json::from_str(&text.cow_replace(": null", ": \"\""))
+                    .expect("Failed to read settings file");
+            settings.normalize();
+            Ok(settings)
+        } else {
+            println!("WARNING: Settings file does not exist, loading default settings...");
+            Ok(Settings::default())
+        }
+    }
+
     fn normalize(&mut self) {
         if matches!(self.export_layout, WiiuExportLayout::WithNamedFolder)
             && self
@@ -305,17 +319,12 @@ impl Settings {
     }
 
     pub fn reload(&mut self) -> Result<()> {
-        *self = if Self::path().exists() {
-            let text = fs::read_to_string(&Self::path()).unwrap();
-            let mut settings: Settings =
-                serde_json::from_str(&text.cow_replace(": null", ": \"\""))
-                    .expect("Failed to read settings file");
-            settings.normalize();
-            settings
-        } else {
-            println!("WARNING: Settings file does not exist, loading default settings...");
-            Settings::default()
-        };
+        *self = Self::load_from(&Self::path())?;
+        Ok(())
+    }
+
+    pub fn reload_tmp(&mut self) -> Result<()> {
+        *self = Self::load_from(&Self::tmp_path())?;
         Ok(())
     }
 

@@ -211,6 +211,24 @@ py -3.9 -m PyInstaller --onedir --windowed --name BCML \
   bcml/__main__.py
 ```
 
+### Build wheel only
+
+```bash
+set -e
+rm -f Cargo.lock
+rustc --version
+rustup show active-toolchain
+cargo --version
+cargo check
+cd bcml/assets
+npm run build
+cd ../..
+py -3.9 -m mkdocs build -d ./bcml/assets/help
+maturin build --release --interpreter python
+wheel="$(ls -t ./target/wheels/*.whl | head -n 1)"
+py -3.9 -m pip install --force-reinstall "$wheel"
+```
+
 ## Usage and Troubleshooting
 
 For information on how to use BCML, see the Help dialog in-app or read the documentation

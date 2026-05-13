@@ -152,6 +152,7 @@ def find_modded_files(
     modded_files = []
     if isinstance(tmp_dir, str):
         tmp_dir = Path(tmp_dir)
+    rsext.reload_settings()
 
     if (tmp_dir / util.get_dlc_path()).exists():
         try:

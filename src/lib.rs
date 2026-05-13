@@ -29,6 +29,9 @@ fn bcml(py: Python, m: &PyModule) -> PyResult<()> {
 fn reload_settings() -> PyResult<()> {
     println!("Reloading settings");
     settings::SETTINGS.write().reload()?;
+    if settings::Settings::tmp_path().exists() {
+        settings::TMP_SETTINGS.write().reload_tmp()?;
+    }
     Ok(())
 }
 
