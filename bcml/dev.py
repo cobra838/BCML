@@ -701,14 +701,17 @@ def convert_mod(mod: Path, to_wiiu: bool, warn_only: bool = False) -> list:
             for hash_id, actor in actorinfo.items()
             if "instSize" in actor
         ]:
-            profile = dict(actor).get("profile", profiles.get(hash_id))
-            if not profile:
+            profile = dict(actor).get("profile")
+            if not isinstance(profile, str):
+                profile = profiles.get(hash_id)
+            ratio = profile_ratios.get(profile) if isinstance(profile, str) else None
+            if ratio is None:
                 handle_warning(
-                    f"Could not detect profile for actor with hash {hash_id}. "
+                    f"Could not detect valid profile for actor with hash {hash_id} "
+                    f"in {actorinfo_log}. "
                     "The instSize value was not converted."
                 )
                 continue
-            ratio = profile_ratios[profile]
             actor["instSize"] = oead.S32(
                 int(
                     (
