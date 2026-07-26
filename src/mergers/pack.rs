@@ -2,7 +2,7 @@ use crate::util::{self, settings, HashMap, HashSet};
 use anyhow::{Context, Result};
 use cow_utils::CowUtils;
 use fs_err as fs;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, Bound};
 use rayon::prelude::*;
 use roead::{
     sarc::{Sarc, SarcWriter},
@@ -23,10 +23,10 @@ static SPECIAL: &[&str] = &[
 
 static EXCLUDE_EXTS: &[&str] = &["sbeventpack"];
 
-pub fn packs_mod(py: Python, parent: &PyModule) -> PyResult<()> {
+pub fn packs_mod(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let packs_module = PyModule::new(py, "packs")?;
-    packs_module.add_wrapped(wrap_pyfunction!(merge_sarcs))?;
-    parent.add_submodule(packs_module)?;
+    packs_module.add_function(wrap_pyfunction!(merge_sarcs, &packs_module)?)?;
+    parent.add_submodule(&packs_module)?;
     Ok(())
 }
 
@@ -114,7 +114,7 @@ fn merge_sarc(sarcs: Vec<Sarc>, endian: Endian) -> Result<Vec<u8>> {
 #[pyfunction]
 pub fn merge_sarcs(py: Python, diffs: HashMap<PathBuf, Vec<PathBuf>>) -> PyResult<()> {
     let settings = settings().clone();
-    py.allow_threads(|| -> Result<()> {
+    py.detach(|| -> Result<()> {
         diffs
             .par_iter()
             .filter(|f| f.0.file_name() != Some(std::ffi::OsStr::new("AocMainField.pack")))

@@ -7,7 +7,7 @@ pub use anyhow::Result;
 use cow_utils::CowUtils;
 use fs_err as fs;
 use path_slash::{PathBufExt, PathExt};
-use pyo3::prelude::*;
+use pyo3::{prelude::*, Bound};
 use rayon::prelude::*;
 use roead::sarc::Sarc;
 use std::{
@@ -16,11 +16,11 @@ use std::{
 };
 
 #[pymodule]
-fn bcml(py: Python, m: &PyModule) -> PyResult<()> {
+fn bcml(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     mergers::mergers_mod(py, m)?;
     manager::manager_mod(py, m)?;
-    m.add_wrapped(wrap_pyfunction!(find_modified_files))?;
-    m.add_wrapped(wrap_pyfunction!(reload_settings))?;
+    m.add_function(wrap_pyfunction!(find_modified_files, m)?)?;
+    m.add_function(wrap_pyfunction!(reload_settings, m)?)?;
     Ok(())
 }
 
@@ -35,12 +35,12 @@ fn reload_settings() -> PyResult<()> {
 }
 
 #[pyfunction]
-fn find_modified_files(py: Python, mod_dir: String) -> PyResult<Vec<String>> {
+fn find_modified_files(py: Python<'_>, mod_dir: String) -> PyResult<Vec<String>> {
     println!("Finding modified files...");
     let mod_dir = Path::new(&mod_dir);
     let content = mod_dir.join(util::content());
     let dlc = mod_dir.join(util::dlc());
-    let files: Vec<PathBuf> = py.allow_threads(|| {
+    let files: Vec<PathBuf> = py.detach(|| {
         glob::glob(&mod_dir.join("**/*").to_string_lossy())
             .expect("Bad glob?!?!?!")
             .filter_map(std::result::Result::ok)
@@ -59,7 +59,7 @@ fn find_modified_files(py: Python, mod_dir: String) -> PyResult<Vec<String>> {
             .collect()
     });
     println!("Found {} modified files...", files.len());
-    let sarc_files: Vec<String> = py.allow_threads(|| -> Result<Vec<String>> {
+    let sarc_files: Vec<String> = py.detach(|| -> Result<Vec<String>> {
         Ok(files
             .par_iter()
             .filter(|f| {
@@ -85,7 +85,7 @@ fn find_modified_files(py: Python, mod_dir: String) -> PyResult<Vec<String>> {
     println!("Found {} modified files in SARCs...", sarc_files.len());
     Ok(files
         .into_par_iter()
-        .map(|file| file.to_slash_lossy())
+        .map(|file| file.to_slash_lossy().into_owned())
         .chain(sarc_files.into_par_iter())
         .collect())
 }

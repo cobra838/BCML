@@ -2,7 +2,7 @@ use crate::{util, Result};
 use anyhow::Context;
 use fs_err as fs;
 use once_cell::sync::Lazy;
-use pyo3::{prelude::*, types::PyBytes};
+use pyo3::{prelude::*, types::{PyAny, PyBytes}, Bound};
 use rayon::prelude::*;
 use roead::{
     byml::{Byml, Map},
@@ -35,11 +35,11 @@ static STOCK_ACTORINFO: Lazy<Result<Arc<ActorMap>>> = Lazy::new(|| {
     load().map(Arc::new)
 });
 
-pub fn actorinfo_mod(py: Python, parent: &PyModule) -> PyResult<()> {
+pub fn actorinfo_mod(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let actorinfo_module = PyModule::new(py, "actorinfo")?;
-    actorinfo_module.add_wrapped(wrap_pyfunction!(diff_actorinfo))?;
-    actorinfo_module.add_wrapped(wrap_pyfunction!(merge_actorinfo))?;
-    parent.add_submodule(actorinfo_module)?;
+    actorinfo_module.add_function(wrap_pyfunction!(diff_actorinfo, &actorinfo_module)?)?;
+    actorinfo_module.add_function(wrap_pyfunction!(merge_actorinfo, &actorinfo_module)?)?;
+    parent.add_submodule(&actorinfo_module)?;
     Ok(())
 }
 
@@ -69,8 +69,8 @@ pub fn merge_actormap(base: &mut ActorMap, other: &ActorMap) {
 }
 
 #[pyfunction]
-fn diff_actorinfo(py: Python, actorinfo_path: String) -> PyResult<PyObject> {
-    let diff = py.allow_threads(|| -> Result<Vec<u8>> {
+fn diff_actorinfo(py: Python<'_>, actorinfo_path: String) -> PyResult<Py<PyAny>> {
+    let diff = py.detach(|| -> Result<Vec<u8>> {
         if let Byml::Map(mod_actorinfo) =
             Byml::from_binary(&decompress(&fs::read(&actorinfo_path)?)?)?
         {
@@ -121,7 +121,7 @@ fn diff_actorinfo(py: Python, actorinfo_path: String) -> PyResult<PyObject> {
 fn merge_actorinfo(py: Python, modded_actors: Vec<u8>) -> PyResult<()> {
     let merge = || -> Result<()> {
         let modded_actor_root = Byml::from_binary(&modded_actors)?;
-        let modded_actors: ActorMap = py.allow_threads(|| -> Result<ActorMap> {
+        let modded_actors: ActorMap = py.detach(|| -> Result<ActorMap> {
             modded_actor_root
                 .as_map()?
                 .into_par_iter()
