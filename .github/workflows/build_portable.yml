@@ -64,7 +64,11 @@ jobs:
 
       - name: Build exe
         run: |
-          $pyd = (Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Filter "bcml*.pyd" | Select-Object -First 1).FullName
+          $sitePackages = python -c "import sysconfig; print(sysconfig.get_paths()['platlib'])"
+          $pyd = (Get-ChildItem -Path "$sitePackages\bcml" -Filter "bcml*.pyd" | Select-Object -First 1).FullName
+          if (-not $pyd) {
+            throw "The built BCML extension was not installed"
+          }
           Copy-Item $pyd -Destination "${{ github.workspace }}\bcml\"
           $aampData = python -c "import aamp, pathlib; print(pathlib.Path(aamp.__file__).resolve().parent / 'botw_hashed_names.txt')"
           if (-not (Test-Path $aampData)) {
