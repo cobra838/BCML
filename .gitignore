@@ -95,9 +95,6 @@ docs/_build/
 
 # PyBuilder
 target/*
-!target/wheels/
-target/wheels/*
-!target/wheels/bcml-3.10.8-cp39-none-win_amd64.whl
 
 
 # Jupyter Notebook
@@ -208,8 +205,8 @@ test.py
 /test
 tmp.*
 Cargo.lock
-# bundle.js
-
+uv.lock
+/bcml/assets/scripts/
 
 # Added by cargo
 #

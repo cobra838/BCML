@@ -155,7 +155,9 @@ pub fn merge_language(
                             group_count: diff.len() as u32,
                             // For newly-created MSBTs, BOTW expects string-style ATR1 data when
                             // attributes are present. Writing `0` here causes BCML/msyt to emit an
-                            // ATR1 blob that downstream tools report as `additionalAttributeData`.
+                            // ATR1 blob that MSBT Editor v2.9.6 report as `additionalAttributeData`.
+                            // Fix in 7237636695255ba7955bfb4ad9b05f7782a8b02f
+                            // Mod for test: https://gamebanana.com/mods/431101 - File EventFlowMsg/Npc_LynxVTS1.msbt after merge
                             atr1_unknown: has_attributes.then_some(4),
                             ato1: None,
                             tsy1: None,

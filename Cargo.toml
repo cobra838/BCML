@@ -10,8 +10,6 @@ name = "bcml"
 crate-type = ["cdylib"]
 
 [dependencies]
-proc-macro2 = "=1.0.56"
-quote = "=1.0.26"
 serde = { version = "=1.0.160", features = ["derive"] }
 serde_derive = "=1.0.160"
 serde_json = "=1.0.96"
@@ -35,7 +33,7 @@ once_cell = "1.13.1"
 path-slash = "0.1.4"
 parking_lot = "0.12.1"
 pyo3 = { version = "0.16.5", features = ["extension-module", "anyhow"] }
-roead = { features = ["yaml"], version = "0.19.0" }
+roead = { git = "https://github.com/cobra838/roead", rev = "4e5e261d03a70b4d6f355780bb565576e1deee2b", features = ["yaml"] }
 rustc-hash = "1.1.0"
 rstb = "0.3.2"
 smartstring = "1.0.1"

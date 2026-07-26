@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #![deny(clippy::unwrap_used)]
 pub mod manager;
 pub mod mergers;
