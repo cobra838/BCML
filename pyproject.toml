@@ -2,6 +2,13 @@
 requires = ["maturin>=1.14.1"]
 build-backend = "maturin"
 
+[tool.maturin]
+python-source = "."
+include = [
+    "bcml/assets/scripts/*.js",
+    "bcml/assets/help/**/*",
+]
+
 [project]
 name = "bcml"
 version = "3.11.0-a1"

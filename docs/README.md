@@ -58,19 +58,9 @@ The package index contains CPython 3.9-3.14 wheels for Windows x64, Linux x64, a
 ### pip
 
 ```cmd
-python -m pip install --upgrade -r https://cobra838.github.io/BCML/latest.txt
-```
+py -3.14 -m pip install --upgrade -r https://cobra838.github.io/BCML/latest.txt
 
-### uv
-
-```cmd
-uv tool install --index https://cobra838.github.io/BCML/simple/ bcml
-```
-
-To update BCML:
-
-```cmd
-uv tool upgrade --index https://cobra838.github.io/BCML/simple/ bcml
+py -3.14 -m bcml
 ```
 
 ## Building from Source
