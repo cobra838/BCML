@@ -53,8 +53,24 @@ changes made by each mod into a single modpack that just works.
 
 ## Install from wheel
 
+The package index contains CPython 3.9-3.14 wheels for Windows x64, Linux x64, and macOS arm64. The portable build is CPython 3.14.
+
+### pip
+
+```cmd
+python -m pip install --upgrade -r https://cobra838.github.io/BCML/latest.txt
 ```
-py -3.9 -m pip install --force-reinstall "https://raw.githubusercontent.com/cobra838/BCML/master/target/wheels/bcml-3.10.8-cp39-none-win_amd64.whl"
+
+### uv
+
+```cmd
+uv tool install --index https://cobra838.github.io/BCML/simple/ bcml
+```
+
+To update BCML:
+
+```cmd
+uv tool upgrade --index https://cobra838.github.io/BCML/simple/ bcml
 ```
 
 ## Building from Source

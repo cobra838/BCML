@@ -1,4 +1,4 @@
-name: Build BCML with Portable Python
+name: Build BCML
 
 on:
   push:
@@ -9,65 +9,37 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  PORTABLE_PYTHON_URL: https://github.com/bjia56/portable-python/releases/download/cpython-v3.9.25-build.0/python-full-3.9.25-windows-x86_64.zip
-  PORTABLE_PYTHON_DIR: ${{ github.workspace }}\python
 
 jobs:
   build_windows_portable:
-    name: Build (Portable Python, Windows)
+    name: Build portable (Windows, CPython 3.14)
     runs-on: windows-latest
-    permissions:
-      contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Read version
-        id: version
-        shell: pwsh
-        run: |
-          $version = (Get-Content pyproject.toml | Select-String '^version = ' | Select-Object -First 1).ToString().Split('"')[1]
-          echo "version=$version" >> $env:GITHUB_OUTPUT
-          echo "tag=v$version" >> $env:GITHUB_OUTPUT
-          echo "artifact_name=BCML_$($version)_portable" >> $env:GITHUB_OUTPUT
-          echo "archive_name=BCML_$($version)_portable.zip" >> $env:GITHUB_OUTPUT
-          Write-Host "Building BCML $version"
-
-      - name: Download portable Python
-        run: |
-          Invoke-WebRequest -Uri "$env:PORTABLE_PYTHON_URL" -OutFile "portable_python.zip"
-          Expand-Archive -Path "portable_python.zip" -DestinationPath "${{ github.workspace }}"
-          Rename-Item "${{ github.workspace }}\python-full-3.9.25-windows-x86_64" "${{ github.workspace }}\python"
-
-      - name: Locate python.exe
-        run: |
-          $py = (Get-ChildItem -Path "$env:PORTABLE_PYTHON_DIR" -Recurse -Filter "python.exe" |
-                  Where-Object { $_.FullName -notmatch "Scripts" } |
-                  Select-Object -First 1).FullName
-          echo "PYTHON_EXE=$py" >> $env:GITHUB_ENV
-          & $py --version
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          architecture: x64
 
       - name: Bootstrap pip
         run: |
-          & "$env:PYTHON_EXE" -m ensurepip --upgrade
-          & "$env:PYTHON_EXE" -m pip install --upgrade pip wheel setuptools
-
-      - name: Install Python dependencies
-        run: |
-          & "$env:PYTHON_EXE" -m pip install -r requirements.txt
-          & "$env:PYTHON_EXE" -m pip install "maturin>=0.12,<0.13" mkdocs mkdocs-material pyinstaller
-          & "$env:PYTHON_EXE" -m pip install "packaging~=21.3" "requests>=2.26.0"
+          python -m ensurepip --upgrade
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install -r requirements-build.txt
 
       - name: Install Rust nightly
         run: |
           rustup set profile default
-          rustup toolchain install nightly-2023-04-20 --component rustfmt --component rust-src
-          rustup override set nightly-2023-04-20
+          rustup toolchain install nightly --component rustfmt --component rust-src
+          rustup override set nightly
           rustc --version
           cargo --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24.x"
           cache: npm
@@ -80,30 +52,25 @@ jobs:
           npm run build
 
       - name: Build docs
-        run: |
-          & "$env:PYTHON_EXE" -m mkdocs build -d ./bcml/assets/help
+        run: python -m mkdocs build -d ./bcml/assets/help
 
-      - name: Build Rust extension (maturin)
-        run: |
-          if (Test-Path "Cargo.lock") { Remove-Item "Cargo.lock" -Force }
-          $mat = Join-Path "${{ github.workspace }}" "python\Scripts\maturin.exe"
-          & $mat build --release --interpreter "$env:PYTHON_EXE"
+      - name: Build Rust extension
+        run: python -m maturin build --release --interpreter python
 
       - name: Install built wheel
         run: |
-          $wheel = (Get-ChildItem -Path "target\wheels" -Filter "*.whl" | Select-Object -Last 1).FullName
-          & "$env:PYTHON_EXE" -m pip install "$wheel"
+          $wheel = (Get-ChildItem -Path "target\wheels" -Filter "*.whl" | Select-Object -First 1).FullName
+          python -m pip install "$wheel"
 
       - name: Build exe
         run: |
           $pyd = (Get-ChildItem -Path "${{ github.workspace }}" -Recurse -Filter "bcml*.pyd" | Select-Object -First 1).FullName
-          echo "Found pyd: $pyd"
           Copy-Item $pyd -Destination "${{ github.workspace }}\bcml\"
-          $aampData = & "$env:PYTHON_EXE" -c "import aamp, pathlib; print(pathlib.Path(aamp.__file__).resolve().parent / 'botw_hashed_names.txt')"
+          $aampData = python -c "import aamp, pathlib; print(pathlib.Path(aamp.__file__).resolve().parent / 'botw_hashed_names.txt')"
           if (-not (Test-Path $aampData)) {
             throw "aamp data file not found: $aampData"
           }
-          & "$env:PYTHON_EXE" -m PyInstaller --onedir --windowed --name BCML `
+          python -m PyInstaller --onedir --windowed --name BCML `
             --icon "bcml/data/bcml.ico" `
             --collect-all bcml `
             --collect-all aamp `
@@ -113,11 +80,10 @@ jobs:
             --add-data "${aampData};aamp" `
             bcml/__main__.py
           $distRoot = Join-Path "${{ github.workspace }}" "dist\BCML\_internal"
-          $prunePaths = @(
+          foreach ($path in @(
             (Join-Path $distRoot "bcml\assets\node_modules"),
             (Join-Path $distRoot "bcml\assets\src")
-          )
-          foreach ($path in $prunePaths) {
+          )) {
             if (Test-Path $path) {
               Remove-Item $path -Recurse -Force
             }
@@ -126,25 +92,199 @@ jobs:
       - name: Package portable build
         shell: pwsh
         run: |
-          $archive = "${{ steps.version.outputs.archive_name }}"
-          if (Test-Path $archive) {
-            Remove-Item $archive -Force
-          }
-          Compress-Archive -Path "dist\\BCML\\*" -DestinationPath $archive -CompressionLevel Optimal
-          Write-Host "Created $archive ($('{0:N0}' -f (Get-Item $archive).Length) bytes)"
+          $version = (Get-Content pyproject.toml | Select-String '^version = ' | Select-Object -First 1).ToString().Split('"')[1]
+          $archive = "BCML_$($version)_portable.zip"
+          Compress-Archive -Path "dist\BCML\*" -DestinationPath $archive -CompressionLevel Optimal
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.version.outputs.artifact_name }}
-          path: ${{ steps.version.outputs.archive_name }}
+          name: portable
+          path: BCML_*_portable.zip
           if-no-files-found: error
 
+      - name: Upload CPython 3.14 Windows wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheel-windows-cp314
+          path: target/wheels/*.whl
+          if-no-files-found: error
+
+  build_wheels:
+    name: Build wheel (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, python: "3.9", label: Windows x64 CPython 3.9, artifact: wheel-windows-cp39 }
+          - { os: windows-latest, python: "3.10", label: Windows x64 CPython 3.10, artifact: wheel-windows-cp310 }
+          - { os: windows-latest, python: "3.11", label: Windows x64 CPython 3.11, artifact: wheel-windows-cp311 }
+          - { os: windows-latest, python: "3.12", label: Windows x64 CPython 3.12, artifact: wheel-windows-cp312 }
+          - { os: windows-latest, python: "3.13", label: Windows x64 CPython 3.13, artifact: wheel-windows-cp313 }
+          - { os: ubuntu-latest, python: "3.9", label: Linux x64 CPython 3.9, artifact: wheel-linux-cp39 }
+          - { os: ubuntu-latest, python: "3.10", label: Linux x64 CPython 3.10, artifact: wheel-linux-cp310 }
+          - { os: ubuntu-latest, python: "3.11", label: Linux x64 CPython 3.11, artifact: wheel-linux-cp311 }
+          - { os: ubuntu-latest, python: "3.12", label: Linux x64 CPython 3.12, artifact: wheel-linux-cp312 }
+          - { os: ubuntu-latest, python: "3.13", label: Linux x64 CPython 3.13, artifact: wheel-linux-cp313 }
+          - { os: ubuntu-latest, python: "3.14", label: Linux x64 CPython 3.14, artifact: wheel-linux-cp314 }
+          - { os: macos-14, python: "3.9", label: macOS arm64 CPython 3.9, artifact: wheel-macos-cp39 }
+          - { os: macos-14, python: "3.10", label: macOS arm64 CPython 3.10, artifact: wheel-macos-cp310 }
+          - { os: macos-14, python: "3.11", label: macOS arm64 CPython 3.11, artifact: wheel-macos-cp311 }
+          - { os: macos-14, python: "3.12", label: macOS arm64 CPython 3.12, artifact: wheel-macos-cp312 }
+          - { os: macos-14, python: "3.13", label: macOS arm64 CPython 3.13, artifact: wheel-macos-cp313 }
+          - { os: macos-14, python: "3.14", label: macOS arm64 CPython 3.14, artifact: wheel-macos-cp314 }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install build tools
+        run: |
+          python -m ensurepip --upgrade
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install -r requirements-build.txt
+
+      - name: Install Rust nightly
+        run: |
+          rustup toolchain install nightly --profile minimal --component rust-src
+          rustup run nightly rustc --version
+          rustup run nightly cargo --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: bcml/assets/package-lock.json
+
+      - name: Build frontend assets
+        run: |
+          npm --prefix bcml/assets install
+          npm --prefix bcml/assets run build
+
+      - name: Build docs
+        run: python -m mkdocs build -d ./bcml/assets/help
+
+      - name: Build wheel
+        run: rustup run nightly python -m maturin build --release --interpreter python
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/wheels/*.whl
+          if-no-files-found: error
+
+  publish:
+    name: Publish release and package index
+    needs: [build_windows_portable, build_wheels]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release
+          merge-multiple: true
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: BCML ${{ steps.version.outputs.version }}
-          files: ${{ steps.version.outputs.archive_name }}
+          files: release/*.zip
           body: |
             Portable build for BCML ${{ steps.version.outputs.version }}.
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Create package index
+        env:
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: |
+          python - <<'PY'
+          from hashlib import sha256
+          from html import escape
+          from pathlib import Path
+          import os
+          import re
+          import shutil
+
+          release_dir = Path("release")
+          site = Path("package-index")
+          wheel_dir = site / "wheels"
+          project_dir = site / "simple" / "bcml"
+          wheel_dir.mkdir(parents=True)
+          project_dir.mkdir(parents=True)
+          wheels = sorted(release_dir.glob("*.whl"))
+          if not wheels:
+              raise SystemExit("No wheel artifacts were downloaded")
+
+          page_url = os.environ["PAGES_URL"]
+          links = []
+          requirements = []
+          for wheel in wheels:
+              name = wheel.name
+              match = re.search(r"-cp(\d+)-cp\d+-(.+)\.whl$", name)
+              if not match:
+                  raise SystemExit(f"Unsupported wheel filename: {name}")
+              tag, platform = match.groups()
+              python_version = f"{tag[0]}.{tag[1:]}"
+              if platform.endswith("win_amd64"):
+                  system, machine = "Windows", "AMD64"
+              elif "macosx" in platform and platform.endswith("arm64"):
+                  system, machine = "Darwin", "arm64"
+              elif "linux" in platform and platform.endswith("x86_64"):
+                  system, machine = "Linux", "x86_64"
+              else:
+                  raise SystemExit(f"Unsupported wheel platform: {platform}")
+
+              destination = wheel_dir / name
+              shutil.copy2(wheel, destination)
+              digest = sha256(destination.read_bytes()).hexdigest()
+              links.append(f'<a href="../../wheels/{escape(name)}#sha256={digest}">{escape(name)}</a>')
+              requirements.append(
+                  f'bcml @ {page_url}/wheels/{name} ; python_version == "{python_version}" '
+                  f'and platform_system == "{system}" and platform_machine == "{machine}"'
+              )
+
+          (site / "simple").mkdir(exist_ok=True)
+          (site / "simple" / "index.html").write_text(
+              "<!doctype html><html><body><a href=\"bcml/\">bcml</a></body></html>\n",
+              encoding="utf-8",
+          )
+          (project_dir / "index.html").write_text(
+              "<!doctype html><html><body>" + "\n".join(links) + "</body></html>\n",
+              encoding="utf-8",
+          )
+          (site / "latest.txt").write_text("\n".join(requirements) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload package index
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: package-index
+
+      - name: Deploy package index
+        uses: actions/deploy-pages@v4
