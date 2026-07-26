@@ -8,7 +8,7 @@ use join_str::jstr;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 use roead::{
-    byml::{Byml, Hash},
+    byml::{Byml, Map},
     yaz0::{compress, decompress},
 };
 use std::{
@@ -162,13 +162,13 @@ impl MapUnit {
     }
 }
 
-fn merge_entries(diff: &Hash, entries: &mut Vec<Byml>) -> Result<()> {
+fn merge_entries(diff: &Map, entries: &mut Vec<Byml>) -> Result<()> {
     let stock_hashes: Vec<u32> = entries
         .iter()
         .map(|e| Ok(e["HashId"].as_u32()?))
         .collect::<Result<_>>()?;
     let mut orphans: Vec<Byml> = vec![];
-    for (hash, entry) in diff["mod"].as_hash()? {
+    for (hash, entry) in diff["mod"].as_map()? {
         let hash = hash.parse::<u32>()?;
         if let Some(idx) = stock_hashes.iter().position(|h| *h == hash) {
             entries[idx] = entry.clone();
@@ -208,17 +208,17 @@ fn merge_entries(diff: &Hash, entries: &mut Vec<Byml>) -> Result<()> {
     Ok(())
 }
 
-fn merge_map(map_unit: MapUnit, diff: &Hash, settings: &Settings) -> Result<(String, u32)> {
+fn merge_map(map_unit: MapUnit, diff: &Map, settings: &Settings) -> Result<(String, u32)> {
     let mut new_map = if settings.dlc_dir().map(|d| d.exists()).unwrap_or_default() {
         map_unit.get_stock_dlc_map()
     } else {
         map_unit.get_stock_base_map()
     }?;
     if let Byml::Array(ref mut objs) = new_map["Objs"] {
-        merge_entries(diff["Objs"].as_hash()?, objs)?;
+        merge_entries(diff["Objs"].as_map()?, objs)?;
     }
     if let Byml::Array(ref mut rails) = new_map["Rails"] {
-        merge_entries(diff["Rails"].as_hash()?, rails)?;
+        merge_entries(diff["Rails"].as_map()?, rails)?;
     }
     let data = new_map.to_binary(settings.endian());
     let size = unsafe {
@@ -258,14 +258,14 @@ fn merge_map(map_unit: MapUnit, diff: &Hash, settings: &Settings) -> Result<(Str
 #[pyfunction]
 pub fn merge_maps(py: Python, diff_bytes: Vec<u8>) -> PyResult<PyObject> {
     let diffs = Byml::from_binary(&diff_bytes).map_err(anyhow::Error::from)?;
-    let rstb_values: HashMap<String, u32> = if let Byml::Hash(diffs) = diffs {
+    let rstb_values: HashMap<String, u32> = if let Byml::Map(diffs) = diffs {
         py.allow_threads(|| -> Result<HashMap<String, u32>> {
             let settings = util::settings().clone();
             diffs
                 .into_par_iter()
                 .map(|(unit, diff)| {
                     let map_unit = MapUnit::from_unit_name(&unit, false)?;
-                    merge_map(map_unit, diff.as_hash()?, &settings)
+                    merge_map(map_unit, diff.as_map()?, &settings)
                 })
                 .collect::<Result<HashMap<String, u32>>>()
         })?

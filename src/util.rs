@@ -105,11 +105,11 @@ pub fn get_stock_pack(pack: &str) -> Result<Arc<Sarc<'static>>> {
     }
 }
 
-pub fn merge_map(base: &mut roead::byml::Hash, other: &roead::byml::Hash, extend: bool) {
+pub fn merge_map(base: &mut roead::byml::Map, other: &roead::byml::Map, extend: bool) {
     other.iter().for_each(|(k, v)| {
         if let Some(bv) = base.get_mut(k) {
             match (bv, v) {
-                (roead::byml::Byml::Hash(bh), roead::byml::Byml::Hash(oh)) => {
+                (roead::byml::Byml::Map(bh), roead::byml::Byml::Map(oh)) => {
                     merge_map(bh, oh, extend);
                 }
                 (roead::byml::Byml::Array(ba), roead::byml::Byml::Array(oa)) => {

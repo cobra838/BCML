@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use pyo3::{prelude::*, types::PyBytes};
 use rayon::prelude::*;
 use roead::{
-    byml::{Byml, Hash},
+    byml::{Byml, Map},
     yaz0::{compress, decompress},
 };
 use std::{collections::BTreeMap, sync::Arc};
@@ -14,7 +14,7 @@ type ActorMap = BTreeMap<u32, Byml>;
 
 static STOCK_ACTORINFO: Lazy<Result<Arc<ActorMap>>> = Lazy::new(|| {
     let load = || -> Result<ActorMap> {
-        if let Byml::Hash(hash) = Byml::from_binary(&decompress(fs::read(util::get_game_file(
+        if let Byml::Map(hash) = Byml::from_binary(&decompress(fs::read(util::get_game_file(
             "Actor/ActorInfo.product.sbyml",
         )?)?)?)? {
             hash.get("Actors")
@@ -23,7 +23,7 @@ static STOCK_ACTORINFO: Lazy<Result<Arc<ActorMap>>> = Lazy::new(|| {
                 .iter()
                 .map(|actor| -> Result<(u32, Byml)> {
                     Ok((
-                        roead::aamp::hash_name(actor.as_hash()?["name"].as_string()?),
+                        roead::aamp::hash_name(actor.as_map()?["name"].as_string()?),
                         actor.clone(),
                     ))
                 })
@@ -55,7 +55,7 @@ pub fn merge_actormap(base: &mut ActorMap, other: &ActorMap) {
     other.iter().for_each(|(k, v)| {
         if let Some(bv) = base.get_mut(k) {
             match (bv, v) {
-                (roead::byml::Byml::Hash(bh), roead::byml::Byml::Hash(oh)) => {
+                (roead::byml::Byml::Map(bh), roead::byml::Byml::Map(oh)) => {
                     util::merge_map(bh, oh, false);
                 }
                 _ => {
@@ -71,43 +71,45 @@ pub fn merge_actormap(base: &mut ActorMap, other: &ActorMap) {
 #[pyfunction]
 fn diff_actorinfo(py: Python, actorinfo_path: String) -> PyResult<PyObject> {
     let diff = py.allow_threads(|| -> Result<Vec<u8>> {
-        if let Byml::Hash(mod_actorinfo) =
+        if let Byml::Map(mod_actorinfo) =
             Byml::from_binary(&decompress(&fs::read(&actorinfo_path)?)?)?
         {
             let stock_actorinfo = stock_actorinfo()?;
-            let diff: Hash = mod_actorinfo
+            let diff: Map = mod_actorinfo
                 .get("Actors")
                 .ok_or_else(|| anyhow::format_err!("Modded actor info missing Actors data"))?
                 .as_array()?
                 .par_iter()
                 .filter_map(|actor| -> Option<(smartstring::alias::String, Byml)> {
-                    actor.as_hash().ok().and_then(|actor_hash| {
+                    actor.as_map().ok().and_then(|actor_hash| {
                         let name = actor_hash.get("name")?.as_string().ok()?;
                         let hash = roead::aamp::hash_name(name);
                         if !stock_actorinfo.contains_key(&hash) {
                             Some((hash.to_string().into(), actor.clone()))
-                        } else if let Some(Byml::Hash(stock_actor)) = stock_actorinfo.get(&hash)
-                            && stock_actor != actor_hash
-                        {
-                            Some((
-                                hash.to_string().into(),
-                                Byml::Hash(
-                                    actor_hash
-                                        .iter()
-                                        .filter_map(|(k, v)| {
-                                            (stock_actor.get(k) != Some(v))
-                                                .then(|| (k.clone(), v.clone()))
-                                        })
-                                        .collect(),
-                                ),
-                            ))
+                        } else if let Some(Byml::Map(stock_actor)) = stock_actorinfo.get(&hash) {
+                            if stock_actor != actor_hash {
+                                Some((
+                                    hash.to_string().into(),
+                                    Byml::Map(
+                                        actor_hash
+                                            .iter()
+                                            .filter_map(|(k, v)| {
+                                                (stock_actor.get(k) != Some(v))
+                                                    .then(|| (k.clone(), v.clone()))
+                                            })
+                                            .collect(),
+                                    ),
+                                ))
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
                     })
                 })
                 .collect();
-            Ok(Byml::Hash(diff).to_text()?.as_bytes().to_vec())
+            Ok(Byml::Map(diff).to_text().as_bytes().to_vec())
         } else {
             anyhow::bail!("Modded actor info is not a hash???")
         }
@@ -121,7 +123,7 @@ fn merge_actorinfo(py: Python, modded_actors: Vec<u8>) -> PyResult<()> {
         let modded_actor_root = Byml::from_binary(&modded_actors)?;
         let modded_actors: ActorMap = py.allow_threads(|| -> Result<ActorMap> {
             modded_actor_root
-                .as_hash()?
+                .as_map()?
                 .into_par_iter()
                 .map(|(h, a)| Ok((h.parse::<u32>()?, a.clone())))
                 .collect()
@@ -141,7 +143,7 @@ fn merge_actorinfo(py: Python, modded_actors: Vec<u8>) -> PyResult<()> {
                 )
             })
             .unzip();
-        let merged_actorinfo = Byml::Hash(
+        let merged_actorinfo = Byml::Map(
             [
                 ("Actors".into(), Byml::Array(actors)),
                 ("Hashes".into(), Byml::Array(hashes)),

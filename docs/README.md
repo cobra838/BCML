@@ -51,53 +51,6 @@ changes made by each mod into a single modpack that just works.
 -   [The latest x64 Visual C++ redistributable](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads#section-2)
 -   Cemu (optional)
 
-## Setup
-
-There are two main ways to install BCML.
-
-### PyPI
-
-Install Python 3.7 - 3.10 (**64 bit version**), making sure to add it to your PATH, and then
-run `pip install bcml`.
-
-**Note for Linux users**: Because of the ways different distros handle Python packaging,
-it often works better to install BCML in some contained environment. There are a few options for
-this. The easiest would be to use [`pipx`](https://github.com/pypa/pipx). You can install `pipx`
-through pip, and then run `pipx install bcml`. In some cases you might need to also run `pipx
-inject bcml pywebview[qt]`.
-
-**Note for Linux white screen bug**: Try setting the environmental variable: `QTWEBENGINE_DISABLE_SANDBOX=1`.
-
-Another option for Linux users is using a virtual environment ("venv"). To do so, you can run
-something like this:
-
-```sh
-python -m venv bcml_env
-source bcml_env/bin/activate # will activate the venv
-pip install bcml
-```
-
-**Full Linux Example with CEMU**
-
-`sudo pacman -S python39` Adjust for you distribution, arch defaults to a newer python
-
-```mkdir -p ~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML
-python3.9 -m venv /.local/bcml_env
-source ~/.local/bcml_env/bin/activate
-python3.9 -m pip install bcml
-~/.local/bcml_env/bin/bcml
-```
-
-to launch BCML in the future
-
-`source ~/.local/bcml_env/bin/activate; ~/.local/bcml_env/bin/bcml`
-
-- In BCML, check 'without cemu' and set export path to '~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML'
-- install your mods
-- execute `curl https://pastebin.com/raw/igCLK2tz -o ~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML/rules.txt`
-
-* If your mods still don't load, verify that ~/.local/share/cemu/graphicPacks/BreathOfTheWild_BCML/rules.txt exist and try 'disable links for master mod' in BCML settings
-
 ## Install from wheel
 
 ```
@@ -108,125 +61,75 @@ py -3.9 -m pip install --force-reinstall "https://raw.githubusercontent.com/cobr
 
 Building from source requires, in addition to the general prerequisites:
 
--   Python 3.9 64 bit
+-   Python 3.9+
 
--   Rust 1.71 (nightly)
+-   Rust 1.99 (nightly)
 
 -   Node.js v14+
 
 Tested versions:
 
 ```bash
+uv run python --version
+# Python 3.14.6
+
 rustc --version
-# rustc 1.71.0-nightly (39c6804b9 2023-04-19)
+# rustc 1.99.0-nightly (9f36de775 2026-07-19)
 
 node --version
-# v24.13.1
+# v26.5.0
 ```
 
-### Python Dependencies
+### Development Environment
 
-```bash
-pip install -r requirements.txt
-python.exe -m pip install --force-reinstall \
-    pip \
-    wheel \
-    setuptools \
-    pyinstaller \
-    mkdocs \
-    mkdocs-material \
-    "maturin>=0.12,<0.13"
+Use [uv](https://github.com/astral-sh/uv) to create a CPython 3.14 environment and install the application and build dependencies:
+
+```cmd
+uv venv --python 3.14 .build-venv
+uv pip install --python .build-venv\Scripts\python.exe -r requirements.txt
+uv pip install --python .build-venv\Scripts\python.exe -r requirements-build.txt
 ```
 
-Tested versions:
-
-wheel 0.46.3  
-setuptools 82.0.1  
-pyinstaller 6.20.0
-mkdocs 1.6.1  
-mkdocs-material 9.7.6
-maturin 0.12.20  
+`requirements.txt` contains the dependencies BCML needs at runtime.
+`requirements-build.txt` contains Maturin, MkDocs, and PyInstaller for local builds.
 
 
 ### Development Build
 
 This validates Rust code, rebuilds frontend assets, rebuilds the Rust Python extension, reinstalls the wheel, and packages BCML using PyInstaller.
 
-```bash
-set -e
-rm -f Cargo.lock
-rustc --version
-rustup show active-toolchain
-cargo --version
-cargo check
-cd bcml/assets
-npm run build
-cd ../..
-py -3.9 -m mkdocs build -d ./bcml/assets/help
-maturin build --release --interpreter python
-wheel="$(ls -t ./target/wheels/*.whl | head -n 1)"
-py -3.9 -m pip install --force-reinstall "$wheel"
-PYD_PATH=$(py -3.9 -c "import sysconfig; print(sysconfig.get_paths()['purelib'] + r'/bcml/bcml.cp39-win_amd64.pyd')")
-py -3.9 -m PyInstaller --onedir --windowed --name BCML \
-  --distpath "./0dist" \
-  --workpath "./build/pyinstaller" \
-  --collect-all bcml \
-  --collect-all aamp \
-  --collect-all byml \
-  --collect-all botw_utils \
-  --collect-all rstb \
-  --icon "bcml/data/bcml.ico" \
-  --add-binary "$PYD_PATH;bcml" \
-  bcml/__main__.py
+```cmd
+rustup run nightly cargo check
+npm --prefix bcml\assets install
+npm --prefix bcml\assets run build
+.build-venv\Scripts\python.exe -m mkdocs build -d .\bcml\assets\help
+rustup run nightly .build-venv\Scripts\maturin.exe build --release --interpreter .build-venv\Scripts\python.exe
+uv pip install --python .build-venv\Scripts\python.exe --force-reinstall --no-deps --no-index --find-links .\target\wheels bcml
+for /f "delims=" %P in ('dir /b .build-venv\Lib\site-packages\bcml\bcml*.pyd') do copy /y ".build-venv\Lib\site-packages\bcml\%P" bcml\
+.build-venv\Scripts\python.exe -m PyInstaller --onedir --windowed --name BCML --distpath .\0dist --workpath .\build\pyinstaller --collect-all bcml --collect-all aamp --collect-all byml --collect-all botw_utils --collect-all rstb --icon bcml\data\bcml.ico --add-data ".build-venv\Lib\site-packages\aamp\botw_hashed_names.txt;aamp" bcml\__main__.py
 ```
 
 ### Quick Rebuild
 
 Use this after dependencies are already installed.
 
-```bash
-set -e
-rm -f Cargo.lock
-rustc --version
-rustup show active-toolchain
-cargo --version
-cargo check
-cd bcml/assets
-npm run build
-cd ../..
-maturin build --release --interpreter python
-wheel="$(ls -t ./target/wheels/*.whl | head -n 1)"
-py -3.9 -m pip install --force-reinstall "$wheel"
-PYD_PATH=$(py -3.9 -c "import sysconfig; print(sysconfig.get_paths()['purelib'] + r'/bcml/bcml.cp39-win_amd64.pyd')")
-py -3.9 -m PyInstaller --onedir --windowed --name BCML \
-  --distpath "./0dist" \
-  --workpath "./build/pyinstaller" \
-  --collect-all bcml \
-  --collect-all aamp \
-  --collect-all byml \
-  --collect-all botw_utils \
-  --collect-all rstb \
-  --icon "bcml/data/bcml.ico" \
-  --add-binary "$PYD_PATH;bcml" \
-  bcml/__main__.py
+```cmd
+rustup run nightly cargo check
+npm --prefix bcml\assets run build
+rustup run nightly .build-venv\Scripts\maturin.exe build --release --interpreter .build-venv\Scripts\python.exe
+uv pip install --python .build-venv\Scripts\python.exe --force-reinstall --no-deps --no-index --find-links .\target\wheels bcml
+for /f "delims=" %P in ('dir /b .build-venv\Lib\site-packages\bcml\bcml*.pyd') do copy /y ".build-venv\Lib\site-packages\bcml\%P" bcml\
+.build-venv\Scripts\python.exe -m PyInstaller --onedir --windowed --name BCML --distpath .\0dist --workpath .\build\pyinstaller --collect-all bcml --collect-all aamp --collect-all byml --collect-all botw_utils --collect-all rstb --icon bcml\data\bcml.ico --add-data ".build-venv\Lib\site-packages\aamp\botw_hashed_names.txt;aamp" bcml\__main__.py
 ```
 
 ### Build wheel only
 
-```bash
-set -e
-rm -f Cargo.lock
-rustc --version
-rustup show active-toolchain
-cargo --version
-cargo check
-cd bcml/assets
-npm run build
-cd ../..
-py -3.9 -m mkdocs build -d ./bcml/assets/help
-maturin build --release --interpreter python
-wheel="$(ls -t ./target/wheels/*.whl | head -n 1)"
-py -3.9 -m pip install --force-reinstall "$wheel"
+```cmd
+rustup run nightly cargo check
+npm --prefix bcml\assets run build
+.build-venv\Scripts\python.exe -m mkdocs build -d .\bcml\assets\help
+rustup run nightly .build-venv\Scripts\maturin.exe build --release --interpreter .build-venv\Scripts\python.exe
+uv pip install --python .build-venv\Scripts\python.exe --force-reinstall --no-deps --no-index --find-links .\target\wheels bcml
 ```
 
 ## Usage and Troubleshooting
