@@ -6,7 +6,7 @@ use anyhow::Context;
 use fs_err as fs;
 use join_str::jstr;
 use parking_lot::RwLockReadGuard;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, Bound};
 use rayon::prelude::*;
 use serde::Deserialize;
 #[cfg(windows)]
@@ -19,10 +19,10 @@ use std::{fs as stdfs, io::ErrorKind};
 #[cfg(windows)]
 use std::{thread, time::Duration};
 
-pub fn manager_mod(py: Python, parent: &PyModule) -> PyResult<()> {
+pub fn manager_mod(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let manager_module = PyModule::new(py, "manager")?;
-    manager_module.add_wrapped(wrap_pyfunction!(link_master_mod))?;
-    parent.add_submodule(manager_module)?;
+    manager_module.add_function(wrap_pyfunction!(link_master_mod, &manager_module)?)?;
+    parent.add_submodule(&manager_module)?;
     Ok(())
 }
 
@@ -117,7 +117,7 @@ impl<'py, 'set> ModLinker<'py, 'set> {
                         .collect::<Vec<PathBuf>>()
                 })
                 .collect();
-        py.allow_threads(|| -> Result<()> {
+        py.detach(|| -> Result<()> {
             mod_folders
                 .into_iter()
                 .rev()

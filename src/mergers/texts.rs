@@ -3,7 +3,7 @@ use fs_err as fs;
 use indexmap::IndexMap;
 use join_str::jstr;
 use msyt::{model::Entry, Msyt};
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyAny, Bound};
 use rayon::prelude::*;
 use roead::{
     sarc::{Sarc, SarcWriter},
@@ -13,11 +13,11 @@ use std::path::Path;
 
 type Diff = IndexMap<String, Entry>;
 
-pub fn texts_mod(py: Python, parent: &PyModule) -> PyResult<()> {
+pub fn texts_mod(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let texts_module = PyModule::new(py, "texts")?;
-    texts_module.add_wrapped(wrap_pyfunction!(diff_language))?;
-    texts_module.add_wrapped(wrap_pyfunction!(merge_language))?;
-    parent.add_submodule(texts_module)?;
+    texts_module.add_function(wrap_pyfunction!(diff_language, &texts_module)?)?;
+    texts_module.add_function(wrap_pyfunction!(merge_language, &texts_module)?)?;
+    parent.add_submodule(&texts_module)?;
     Ok(())
 }
 
@@ -27,8 +27,8 @@ pub fn diff_language(
     mod_bootup_path: String,
     stock_bootup_path: String,
     only_new_keys: bool,
-) -> PyResult<PyObject> {
-    let diff = py.allow_threads(|| -> Result<IndexMap<String, Diff>> {
+) -> PyResult<Py<PyAny>> {
+    let diff = py.detach(|| -> Result<IndexMap<String, Diff>> {
         let language = &Path::new(&mod_bootup_path)
             .file_stem()
             .expect("Okay, how does this path have no name?")
@@ -124,7 +124,7 @@ pub fn merge_language(
     } else {
         msyt::Endianness::Little
     };
-    py.allow_threads(|| -> Result<()> {
+    py.detach(|| -> Result<()> {
         let language = &Path::new(&stock_bootup_path)
             .file_stem()
             .expect("Okay, how does this path have no name?")

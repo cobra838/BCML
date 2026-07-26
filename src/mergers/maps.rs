@@ -5,7 +5,7 @@ use crate::{
 use anyhow::{Context, Result};
 use fs_err as fs;
 use join_str::jstr;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::{PyAny, PyDict}, Bound};
 use rayon::prelude::*;
 use roead::{
     byml::{Byml, Map},
@@ -17,10 +17,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn maps_mod(py: Python, parent: &PyModule) -> PyResult<()> {
+pub fn maps_mod(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let maps_module = PyModule::new(py, "maps")?;
-    maps_module.add_wrapped(wrap_pyfunction!(merge_maps))?;
-    parent.add_submodule(maps_module)?;
+    maps_module.add_function(wrap_pyfunction!(merge_maps, &maps_module)?)?;
+    parent.add_submodule(&maps_module)?;
     Ok(())
 }
 
@@ -256,10 +256,10 @@ fn merge_map(map_unit: MapUnit, diff: &Map, settings: &Settings) -> Result<(Stri
 }
 
 #[pyfunction]
-pub fn merge_maps(py: Python, diff_bytes: Vec<u8>) -> PyResult<PyObject> {
+pub fn merge_maps(py: Python<'_>, diff_bytes: Vec<u8>) -> PyResult<Py<PyAny>> {
     let diffs = Byml::from_binary(&diff_bytes).map_err(anyhow::Error::from)?;
     let rstb_values: HashMap<String, u32> = if let Byml::Map(diffs) = diffs {
-        py.allow_threads(|| -> Result<HashMap<String, u32>> {
+        py.detach(|| -> Result<HashMap<String, u32>> {
             let settings = util::settings().clone();
             diffs
                 .into_par_iter()
@@ -272,5 +272,9 @@ pub fn merge_maps(py: Python, diff_bytes: Vec<u8>) -> PyResult<PyObject> {
     } else {
         Default::default()
     };
-    Ok(rstb_values.into_py(py))
+    let values = PyDict::new(py);
+    for (path, size) in rstb_values {
+        values.set_item(path, size)?;
+    }
+    Ok(values.into_any().unbind())
 }
