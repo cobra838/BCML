@@ -1,4 +1,4 @@
-name: Publish BCML wheels
+name: Build BCML wheels
 
 on:
   workflow_dispatch:
@@ -92,8 +92,6 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v7
-
       - name: Download wheel artifacts
         uses: actions/download-artifact@v8
         with:
@@ -162,7 +160,10 @@ jobs:
               "<!doctype html><html><body>" + "\n".join(links) + "</body></html>\n",
               encoding="utf-8",
           )
-          (site / "latest.txt").write_text("\n".join(requirements) + "\n", encoding="utf-8")
+          (site / "latest.txt").write_text(
+              "-r https://cobra838.github.io/oead/latest.txt\n" + "\n".join(requirements) + "\n",
+              encoding="utf-8",
+          )
           PY
 
       - name: Upload package index

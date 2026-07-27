@@ -1,4 +1,4 @@
-name: Build BCML
+name: Build BCMLP
 
 on:
   push:
@@ -64,7 +64,7 @@ jobs:
       - name: Install built wheel
         run: |
           $wheel = (Get-ChildItem -Path "target\wheels" -Filter "*.whl" | Select-Object -First 1).FullName
-          python -m pip install "$wheel"
+          python -m pip install -r https://cobra838.github.io/oead/latest.txt "$wheel"
 
       - name: Build exe
         run: |
@@ -286,7 +286,10 @@ jobs:
               "<!doctype html><html><body>" + "\n".join(links) + "</body></html>\n",
               encoding="utf-8",
           )
-          (site / "latest.txt").write_text("\n".join(requirements) + "\n", encoding="utf-8")
+          (site / "latest.txt").write_text(
+              "-r https://cobra838.github.io/oead/latest.txt\n" + "\n".join(requirements) + "\n",
+              encoding="utf-8",
+          )
           PY
 
       - name: Upload package index
