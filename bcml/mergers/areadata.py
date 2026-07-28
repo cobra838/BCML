@@ -9,10 +9,10 @@ from bcml.util import BcmlMod
 from bcml.mergers import rstable
 
 
-def get_stock_areadata() -> oead.byml.Hash:
+def get_stock_areadata() -> oead.byml.Dictionary:
     if not hasattr(get_stock_areadata, "areadata"):
         get_stock_areadata.areadata = oead.byml.to_text(
-            oead.byml.Hash(
+            oead.byml.Dictionary(
                 {
                     str(area["AreaNumber"].v): area
                     for area in oead.byml.from_binary(
@@ -28,17 +28,17 @@ def get_stock_areadata() -> oead.byml.Hash:
     return oead.byml.from_text(get_stock_areadata.areadata)
 
 
-def get_modded_areadata(areadata: oead.byml.Array) -> oead.byml.Hash:
+def get_modded_areadata(areadata: oead.byml.Array) -> oead.byml.Dictionary:
     stock_areadata = get_stock_areadata()
-    mod_areadata = oead.byml.Hash(
+    mod_areadata = oead.byml.Dictionary(
         {str(area["AreaNumber"].v): area for area in areadata}
     )
-    modified = oead.byml.Hash()
+    modified = oead.byml.Dictionary()
     try:
         for area_num in [
             k for k in mod_areadata if mod_areadata[k] != stock_areadata[k]
         ]:
-            modified[area_num] = oead.byml.Hash(
+            modified[area_num] = oead.byml.Dictionary(
                 {
                     k: v
                     for k, v in mod_areadata[area_num].items()
@@ -125,7 +125,7 @@ class AreaDataMerger(mergers.Merger):
     def consolidate_diffs(self, diffs: list):
         if not diffs:
             return {}
-        all_diffs = oead.byml.Hash()
+        all_diffs = oead.byml.Dictionary()
         for diff in diffs:
             util.dict_merge(all_diffs, diff, overwrite_lists=True)
         return all_diffs

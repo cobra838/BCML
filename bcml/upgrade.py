@@ -467,7 +467,7 @@ def _convert_gamedata_log(log: Path):
     diff = oead.byml.from_text(log.read_text("utf-8"))
     log.write_text(
         oead.byml.to_text(
-            oead.byml.Hash(
+            oead.byml.Dictionary(
                 {
                     data_type: {"add": data, "del": oead.byml.Array()}
                     for data_type, data in diff.items()
@@ -481,7 +481,7 @@ def _convert_gamedata_log(log: Path):
 def _convert_savedata_log(log: Path):
     diff = oead.byml.from_text(log.read_text("utf-8"))
     log.write_text(
-        oead.byml.to_text(oead.byml.Hash({"add": diff, "del": oead.byml.Array()})),
+        oead.byml.to_text(oead.byml.Dictionary({"add": diff, "del": oead.byml.Array()})),
         encoding="utf-8",
     )
 

@@ -12,7 +12,7 @@ from typing import Dict, Union, List, Tuple
 from zlib import crc32
 
 import oead
-from oead.byml import Hash, Array  # pylint: disable=import-error
+from oead.byml import Dictionary, Array  # pylint: disable=import-error
 import rstb
 import rstb.util
 
@@ -26,8 +26,8 @@ def key_from_coords(x: float, y: float, z: float) -> str:
     return str(ceil(x)) + str(ceil(y)) + str(ceil(z))
 
 
-def get_id(item: Hash) -> str:
-    def find_name(item: Hash) -> str:
+def get_id(item: Dictionary) -> str:
+    def find_name(item: Dictionary) -> str:
         for k, v in item.items():
             if "name" in k.lower():
                 return v
@@ -92,15 +92,15 @@ class MainfieldStaticMerger(mergers.Merger):
             )
         else:
             return None
-        stock_static: Hash = oead.byml.from_binary(util.decompress(stock_data))
-        mod_static: Hash = oead.byml.from_binary(util.decompress(mod_data))
-        diffs = Hash()
+        stock_static: Dictionary = oead.byml.from_binary(util.decompress(stock_data))
+        mod_static: Dictionary = oead.byml.from_binary(util.decompress(mod_data))
+        diffs = Dictionary()
         for cat in stock_static:
             if cat not in stock_static:
                 continue
             stock_items = {get_id(item): item for item in stock_static[cat]}
             mod_items = {get_id(item): item for item in mod_static[cat]}
-            diffs[cat] = Hash(
+            diffs[cat] = Dictionary(
                 {
                     item_id: item
                     for item_id, item in mod_items.items()
@@ -125,7 +125,7 @@ class MainfieldStaticMerger(mergers.Merger):
             )
 
     def get_mod_diff(self, mod: util.BcmlMod):
-        diff = oead.byml.Hash()
+        diff = oead.byml.Dictionary()
         if self.is_mod_logged(mod):
             diff = oead.byml.from_text(
                 (mod.path / "logs" / self._log_name).read_text("utf-8")
@@ -152,7 +152,7 @@ class MainfieldStaticMerger(mergers.Merger):
     def consolidate_diffs(self, diffs):
         if not diffs:
             return {}
-        all_diffs = oead.byml.Hash()
+        all_diffs = oead.byml.Dictionary()
         for diff in diffs:
             util.dict_merge(all_diffs, diff, overwrite_lists=True)
         return all_diffs
@@ -189,7 +189,7 @@ class MainfieldStaticMerger(mergers.Merger):
                 pass
             return
         stock_static = oead.byml.from_binary(util.decompress(static_data))
-        merged = Hash()
+        merged = Dictionary()
         for cat in stock_static:
             if cat in diffs:
                 items = {get_id(item): item for item in stock_static[cat]}

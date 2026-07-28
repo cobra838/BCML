@@ -38,10 +38,10 @@ class QuestMerger(mergers.Merger):
             util.decompress(title_sarc.get_file("Quest/QuestProduct.sbquestpack").data)
         )
         mod_names = [q["Name"] for q in mod_quests]
-        diffs = oead.byml.Hash(
+        diffs = oead.byml.Dictionary(
             {
                 "add": oead.byml.Array(),
-                "mod": oead.byml.Hash(),
+                "mod": oead.byml.Dictionary(),
                 "del": oead.byml.Array({q for q in stock_names if q not in mod_names}),
             }
         )
@@ -90,10 +90,10 @@ class QuestMerger(mergers.Merger):
     def consolidate_diffs(self, diffs: list):
         if not diffs:
             return {}
-        all_diffs = oead.byml.Hash(
+        all_diffs = oead.byml.Dictionary(
             {
                 "add": oead.byml.Array(),
-                "mod": oead.byml.Hash(),
+                "mod": oead.byml.Dictionary(),
                 "del": oead.byml.Array(),
             }
         )

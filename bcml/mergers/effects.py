@@ -7,7 +7,7 @@ from bcml import util, mergers
 from bcml.mergers import rstable
 
 
-def get_stock_effects() -> oead.byml.Hash:
+def get_stock_effects() -> oead.byml.Dictionary:
     bootup_sarc = oead.Sarc(util.get_game_file("Pack/Bootup.pack").read_bytes())
     return oead.byml.from_binary(
         util.decompress(bootup_sarc.get_file("Ecosystem/StatusEffectList.sbyml").data)
@@ -37,7 +37,7 @@ class StatusEffectMerger(mergers.Merger):
         mod_effects = oead.byml.from_binary(
             util.decompress(bootup_sarc.get_file("Ecosystem/StatusEffectList.sbyml").data)
         )[0]
-        diff = oead.byml.Hash(
+        diff = oead.byml.Dictionary(
             {
                 effect: params
                 for effect, params in mod_effects.items()
@@ -57,7 +57,7 @@ class StatusEffectMerger(mergers.Merger):
             del diff_material
 
     def get_mod_diff(self, mod: util.BcmlMod):
-        diff = oead.byml.Hash()
+        diff = oead.byml.Dictionary()
         if self.is_mod_logged(mod):
             diff = oead.byml.from_text(
                 (mod.path / "logs" / self._log_name).read_text("utf-8")
@@ -84,7 +84,7 @@ class StatusEffectMerger(mergers.Merger):
     def consolidate_diffs(self, diffs):
         if not diffs:
             return {}
-        all_diffs = oead.byml.Hash()
+        all_diffs = oead.byml.Dictionary()
         for diff in diffs:
             util.dict_merge(all_diffs, diff, overwrite_lists=True)
             del diff

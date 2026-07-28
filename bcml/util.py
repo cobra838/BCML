@@ -457,7 +457,7 @@ def vprint(content):
     if "Pool" in current_process().name:
         return
     if not isinstance(content, str):
-        if isinstance(content, (oead.byml.Hash, oead.byml.Array)):
+        if isinstance(content, (oead.byml.Dictionary, oead.byml.Array)):
             content = oead.byml.to_text(content)
         elif isinstance(content, oead.aamp.ParameterIO):
             content = content.to_text()
@@ -1494,8 +1494,8 @@ UNDERRIDE = "UNDERRIDE_CONST"
 
 
 def dict_merge(
-    dct: Union[dict, oead.byml.Hash],
-    merge_dct: Union[dict, oead.byml.Hash],
+    dct: Union[dict, oead.byml.Dictionary],
+    merge_dct: Union[dict, oead.byml.Dictionary],
     overwrite_lists: bool = False,
     shallow: bool = False,
 ):
@@ -1504,8 +1504,8 @@ def dict_merge(
             dct[k] = merge_dct[k]
         elif (
             k in dct
-            and (isinstance(dct[k], (dict, oead.byml.Hash)))
-            and (isinstance(merge_dct[k], (Mapping, oead.byml.Hash)))
+            and (isinstance(dct[k], (dict, oead.byml.Dictionary)))
+            and (isinstance(merge_dct[k], (Mapping, oead.byml.Dictionary)))
         ):
             dict_merge(dct[k], merge_dct[k], overwrite_lists=overwrite_lists)
         elif (

@@ -17,11 +17,11 @@ def pickle_plist(plist: oead.aamp.ParameterList):
     return construct_plist, (bytes(tmp_pio.to_binary()),)
 
 
-def construct_byml(data: bytes) -> Union[oead.byml.Hash, oead.byml.Array]:
+def construct_byml(data: bytes) -> Union[oead.byml.Dictionary, oead.byml.Array]:
     return oead.byml.from_binary(data)
 
 
-def pickle_byml(byml: Union[oead.byml.Hash, oead.byml.Array]):
+def pickle_byml(byml: Union[oead.byml.Dictionary, oead.byml.Array]):
     return construct_byml, (bytes(oead.byml.to_binary(byml, big_endian=False)),)
 
 
@@ -32,7 +32,7 @@ def pickle_u32(u32: oead.U32):
 PICKLE_MAP = {
     oead.aamp.ParameterIO: pickle_pio,
     oead.aamp.ParameterList: pickle_plist,
-    oead.byml.Hash: pickle_byml,
+    oead.byml.Dictionary: pickle_byml,
     oead.byml.Array: pickle_byml,
     oead.U32: pickle_u32,
 }

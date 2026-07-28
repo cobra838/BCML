@@ -11,7 +11,7 @@ from bcml.util import BcmlMod
 from bcml import bcml as rsext
 
 
-def get_stock_actorinfo() -> oead.byml.Hash:
+def get_stock_actorinfo() -> oead.byml.Dictionary:
     actorinfo = util.get_game_file("Actor/ActorInfo.product.sbyml")
     return oead.byml.from_binary(util.decompress(actorinfo.read_bytes()))
 
@@ -44,14 +44,14 @@ class ActorInfoMerger(mergers.Merger):
             return None
         return rsext.mergers.actorinfo.diff_actorinfo(str(actor_file))
 
-    def log_diff(self, mod_dir: Path, diff_material: Union[oead.byml.Hash, list]):
+    def log_diff(self, mod_dir: Path, diff_material: Union[oead.byml.Dictionary, list]):
         if isinstance(diff_material, List):
             diff_material = self.generate_diff(mod_dir, diff_material)
         if diff_material:
             (mod_dir / "logs" / self._log_name).write_bytes(diff_material)
 
     def get_mod_diff(self, mod: BcmlMod):
-        diffs: Dict[str, oead.Byml.Hash] = {}
+        diffs: Dict[str, oead.byml.Dictionary] = {}
         if self.is_mod_logged(mod):
             util.dict_merge(
                 diffs,
@@ -78,7 +78,7 @@ class ActorInfoMerger(mergers.Merger):
         return diffs
 
     def consolidate_diffs(self, diffs: list):
-        all_diffs: Dict[str, oead.Byml.Hash] = {}
+        all_diffs: Dict[str, oead.byml.Dictionary] = {}
         inst_sizes = {}
         for diff in diffs:
             for actor_hash, inst_size in [(h, a["instSize"].v) for h, a in diff.items() if "instSize" in a]:
@@ -87,7 +87,7 @@ class ActorInfoMerger(mergers.Merger):
             util.dict_merge(all_diffs, diff, overwrite_lists=True)
         for actor_hash, inst_size in inst_sizes.items():
             all_diffs[actor_hash]["instSize"] = oead.S32(inst_size)
-        return oead.byml.Hash(all_diffs)
+        return oead.byml.Dictionary(all_diffs)
 
     @util.timed
     def perform_merge(self):

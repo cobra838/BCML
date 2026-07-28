@@ -11,7 +11,7 @@ from bcml.util import BcmlMod
 from bcml.mergers import rstable
 
 
-def get_stock_eventinfo() -> oead.byml.Hash:
+def get_stock_eventinfo() -> oead.byml.Dictionary:
     if not hasattr(get_stock_eventinfo, "event_info"):
         get_stock_eventinfo.event_info = oead.byml.to_text(
             oead.byml.from_binary(
@@ -25,9 +25,9 @@ def get_stock_eventinfo() -> oead.byml.Hash:
     return oead.byml.from_text(get_stock_eventinfo.event_info)
 
 
-def get_modded_events(event_info: oead.byml.Hash) -> oead.byml.Hash:
+def get_modded_events(event_info: oead.byml.Dictionary) -> oead.byml.Dictionary:
     stock_events = get_stock_eventinfo()
-    modded_events = oead.byml.Hash(
+    modded_events = oead.byml.Dictionary(
         {
             event: data
             for event, data in event_info.items()
@@ -111,7 +111,7 @@ class EventInfoMerger(mergers.Merger):
     def consolidate_diffs(self, diffs: list):
         if not diffs:
             return {}
-        all_diffs = oead.byml.Hash()
+        all_diffs = oead.byml.Dictionary()
         for diff in diffs:
             util.dict_merge(all_diffs, diff, shallow=True)
         return all_diffs

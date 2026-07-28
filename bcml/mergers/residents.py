@@ -9,15 +9,15 @@ import rstb
 from bcml import util, mergers
 from bcml.util import BcmlMod
 from bcml.mergers import rstable
-from oead.byml import Hash
+from oead.byml import Dictionary
 
 
-def get_stock_residents() -> Hash:
+def get_stock_residents() -> Dictionary:
     bootup_sarc = oead.Sarc(util.get_game_file("Pack/Bootup.pack").read_bytes())
     residents = oead.byml.from_binary(
         bytes(bootup_sarc.get_file("Actor/ResidentActors.byml").data)
     )
-    return Hash({actor["name"]: actor for actor in residents})
+    return Dictionary({actor["name"]: actor for actor in residents})
 
 
 class ResidentsMerger(mergers.Merger):
@@ -40,7 +40,7 @@ class ResidentsMerger(mergers.Merger):
         bootup_sarc = oead.Sarc(
             (mod_dir / util.get_content_path() / "Pack" / "Bootup.pack").read_bytes()
         )
-        mod_residents = Hash(
+        mod_residents = Dictionary(
             {
                 actor["name"]: actor
                 for actor in oead.byml.from_binary(
@@ -49,7 +49,7 @@ class ResidentsMerger(mergers.Merger):
             }
         )
         stock_residents = get_stock_residents()
-        diff = Hash(
+        diff = Dictionary(
             {
                 actor: data
                 for actor, data in mod_residents.items()
@@ -72,7 +72,7 @@ class ResidentsMerger(mergers.Merger):
             del diff_material
 
     def get_mod_diff(self, mod: util.BcmlMod):
-        diff = oead.byml.Hash()
+        diff = oead.byml.Dictionary()
         if self.is_mod_logged(mod):
             diff = oead.byml.from_text(
                 (mod.path / "logs" / self._log_name).read_text("utf-8")
@@ -99,7 +99,7 @@ class ResidentsMerger(mergers.Merger):
     def consolidate_diffs(self, diffs):
         if not diffs:
             return {}
-        all_diffs = oead.byml.Hash()
+        all_diffs = oead.byml.Dictionary()
         for diff in diffs:
             util.dict_merge(all_diffs, diff, overwrite_lists=True)
         return all_diffs
@@ -131,7 +131,7 @@ class ResidentsMerger(mergers.Merger):
 
         residents = get_stock_residents()
         util.dict_merge(residents, diffs, overwrite_lists=True)
-        residents = Hash(
+        residents = Dictionary(
             {actor: data for actor, data in residents.items() if "remove" not in data}
         )
 

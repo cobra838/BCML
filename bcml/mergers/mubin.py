@@ -11,7 +11,7 @@ from typing import Dict, Union, List, Tuple
 from zlib import crc32
 
 import oead
-from oead.byml import Hash, Array  # pylint: disable=import-error
+from oead.byml import Dictionary, Array  # pylint: disable=import-error
 import rstb
 import rstb.util
 
@@ -31,7 +31,7 @@ def consolidate_map_files(modded_maps: List[Path]) -> List[Map]:
     )
 
 
-def get_stock_map(map_unit: Union[Map, tuple], force_vanilla: bool = False) -> Hash:
+def get_stock_map(map_unit: Union[Map, tuple], force_vanilla: bool = False) -> Dictionary:
     if isinstance(map_unit, tuple):
         map_unit = Map(*map_unit)
     try:
@@ -107,7 +107,7 @@ def get_stock_map(map_unit: Union[Map, tuple], force_vanilla: bool = False) -> H
     return oead.byml.from_binary(map_bytes)
 
 
-def get_modded_map(map_unit: Union[Map, tuple], tmp_dir: Path) -> Hash:
+def get_modded_map(map_unit: Union[Map, tuple], tmp_dir: Path) -> Dictionary:
     if isinstance(map_unit, tuple):
         map_unit = Map(*map_unit)
     map_bytes = None
@@ -175,7 +175,7 @@ def get_modded_map(map_unit: Union[Map, tuple], tmp_dir: Path) -> Hash:
     return oead.byml.from_binary(map_bytes)
 
 
-def get_map_diff(map_unit: Map, tmp_dir: Path, new_hashes: bool = False) -> Hash:
+def get_map_diff(map_unit: Map, tmp_dir: Path, new_hashes: bool = False) -> Dictionary:
     mod_map = get_modded_map(map_unit, tmp_dir)
     stock_map = True
     for obj in mod_map["Objs"]:
@@ -185,15 +185,15 @@ def get_map_diff(map_unit: Map, tmp_dir: Path, new_hashes: bool = False) -> Hash
             break
     base_map = get_stock_map(map_unit, force_vanilla=stock_map)
 
-    def diff_objs() -> Hash:
+    def diff_objs() -> Dictionary:
         base_hashes = [int(obj["HashId"]) for obj in base_map["Objs"]]
         mod_hashes = [int(obj["HashId"]) for obj in mod_map["Objs"]]
 
-        diffs = Hash()
+        diffs = Dictionary()
         diffs["add"] = Array(
             [obj for obj in mod_map["Objs"] if int(obj["HashId"]) not in base_hashes]
         )
-        diffs["mod"] = Hash(
+        diffs["mod"] = Dictionary(
             {
                 str(obj["HashId"]): obj
                 for obj in mod_map["Objs"]
@@ -225,11 +225,11 @@ def get_map_diff(map_unit: Map, tmp_dir: Path, new_hashes: bool = False) -> Hash
                             )
         return diffs
 
-    def diff_rails() -> Hash:
+    def diff_rails() -> Dictionary:
         base_hashes = [int(rail["HashId"]) for rail in base_map["Rails"]]
         mod_hashes = [int(rail["HashId"]) for rail in mod_map["Rails"]]
 
-        diffs = Hash()
+        diffs = Dictionary()
         diffs["add"] = Array(
             [
                 rail
@@ -237,7 +237,7 @@ def get_map_diff(map_unit: Map, tmp_dir: Path, new_hashes: bool = False) -> Hash
                 if int(rail["HashId"]) not in base_hashes
             ]
         )
-        diffs["mod"] = Hash(
+        diffs["mod"] = Dictionary(
             {
                 str(rail["HashId"]): rail
                 for rail in mod_map["Rails"]
@@ -258,10 +258,10 @@ def get_map_diff(map_unit: Map, tmp_dir: Path, new_hashes: bool = False) -> Hash
     return (
         "_".join(map_unit),
         oead.byml.to_text(
-            Hash(
+            Dictionary(
                 {
                     "Objs": diff_objs(),
-                    "Rails": diff_rails() if map_unit.type == "Static" else Hash(),
+                    "Rails": diff_rails() if map_unit.type == "Static" else Dictionary(),
                 }
             )
         ),
@@ -273,10 +273,10 @@ def generate_modded_map_log(
     modded_mubins: List[Path],
     pool: multiprocessing.pool.Pool = None,
     new_hashes: bool = False,
-) -> Hash:
+) -> Dictionary:
     modded_maps = consolidate_map_files(modded_mubins)
     this_pool = pool or util.start_pool()
-    diffs = oead.byml.Hash(
+    diffs = oead.byml.Dictionary(
         {
             map_unit: oead.byml.from_text(diff)
             for map_unit, diff in this_pool.imap_unordered(
@@ -525,11 +525,11 @@ def merge_dungeonstatic(diffs: dict = None):
     output_static.write_bytes(data)
 
 
-def parse_legacy_diff(text: str) -> Hash:
+def parse_legacy_diff(text: str) -> Dictionary:
     diff = oead.byml.from_text(text)
-    return Hash(
+    return Dictionary(
         {
-            unit: Hash({"Objs": changes, "Rails": Hash()})
+            unit: Dictionary({"Objs": changes, "Rails": Dictionary()})
             for unit, changes in diff.items()
         }
     )
@@ -576,7 +576,7 @@ class MapMerger(mergers.Merger):
         diffs = []
         if self.is_mod_logged(mod):
             diff_text = (mod.path / "logs" / self._log_name).read_text(encoding="utf-8")
-            diff: Hash
+            diff: Dictionary
             if not ("Rails" in diff_text and "Objs" in diff_text):
                 diff = parse_legacy_diff(diff_text)
             else:
@@ -599,21 +599,21 @@ class MapMerger(mergers.Merger):
         return diffs
 
     def consolidate_diffs(self, diffs: list):
-        a_diffs = Hash()
+        a_diffs = Dictionary()
         for mod_diff in diffs:
             for file, diff in mod_diff.items():
                 # a_map = Map(*file.split("_"))
                 if file not in a_diffs:
                     a_diffs[file] = Array()
                 a_diffs[file].append(diff)
-        c_diffs = Hash()
+        c_diffs = Dictionary()
         for file, mods in a_diffs.items():
-            c_diffs[file] = Hash(
+            c_diffs[file] = Dictionary(
                 {
-                    "Objs": Hash(
+                    "Objs": Dictionary(
                         {
                             "add": Array(),
-                            "mod": Hash(),
+                            "mod": Dictionary(),
                             "del": Array(
                                 [
                                     oead.U32(h)
@@ -633,10 +633,10 @@ class MapMerger(mergers.Merger):
                             ),
                         }
                     ),
-                    "Rails": Hash(
+                    "Rails": Dictionary(
                         {
                             "add": Array(),
-                            "mod": Hash(),
+                            "mod": Dictionary(),
                             "del": Array(
                                 [
                                     oead.U32(h)
@@ -825,7 +825,7 @@ class DungeonStaticMerger(mergers.Merger):
             )
 
     def get_mod_diff(self, mod: util.BcmlMod):
-        diffs = Hash()
+        diffs = Dictionary()
         if self.is_mod_logged(mod):
             util.dict_merge(
                 diffs,
