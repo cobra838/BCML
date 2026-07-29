@@ -1652,7 +1652,10 @@ class Messager:
 def get_7z_path():
     if system() == "Windows":
         return str(get_exec_dir() / "helpers" / "7z.exe")
-    bundle_path = get_exec_dir() / "helpers" / "7z"
+    if system() == "Darwin":  # MacOS
+        bundle_path = get_exec_dir() / "helpers" / "7zz"
+    else:  # Linux and other systems
+        bundle_path = get_exec_dir() / "helpers" / "7zzs"
     if not os.access(bundle_path, os.X_OK):
         if not os.access(bundle_path, os.W_OK):
             raise PermissionError(
