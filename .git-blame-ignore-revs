@@ -1,0 +1,13 @@
+# Ignore line ending normalization
+c274e0352f796e8407cba153963586a211b96313
+
+
+
+# To use
+# git config --local blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Check
+# git config --local --get blame.ignoreRevsFile
+
+# Disable
+# git config --local --unset-all blame.ignoreRevsFile
