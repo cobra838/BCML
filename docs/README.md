@@ -57,7 +57,7 @@ The package index contains CPython 3.9-3.14 wheels for Windows x64, Linux x64, a
 
 ### pip
 
-```cmd
+```bash
 py -3.14 -m pip install --upgrade -r https://cobra838.github.io/BCML/latest.txt
 
 py -3.14 -m bcml
@@ -90,10 +90,22 @@ node --version
 
 Use [uv](https://github.com/astral-sh/uv) to create a CPython 3.14 environment and install the application and build dependencies:
 
+For cmd:
+
 ```cmd
-uv venv --python 3.14 .build-venv
-uv pip install --python .build-venv\Scripts\python.exe -r requirements.txt
-uv pip install --python .build-venv\Scripts\python.exe -r requirements-build.txt
+uv venv --python 3.14 .venv
+call .venv\Scripts\activate
+uv pip install -r requirements.txt
+uv pip install -r requirements-build.txt
+```
+
+For Bash:
+
+```bash
+uv venv --python 3.14 .venv
+source .venv/Scripts/activate
+uv pip install -r requirements.txt
+uv pip install -r requirements-build.txt
 ```
 
 `requirements.txt` contains the dependencies BCML needs at runtime.
@@ -104,38 +116,38 @@ uv pip install --python .build-venv\Scripts\python.exe -r requirements-build.txt
 
 This validates Rust code, rebuilds frontend assets, rebuilds the Rust Python extension, reinstalls the wheel, and packages BCML using PyInstaller.
 
-```cmd
+```bash
 rustup run nightly cargo check
-npm --prefix bcml\assets install
-npm --prefix bcml\assets run build
-.build-venv\Scripts\python.exe -m mkdocs build -d .\bcml\assets\help
-rustup run nightly .build-venv\Scripts\maturin.exe build --release --interpreter .build-venv\Scripts\python.exe
-uv pip install --python .build-venv\Scripts\python.exe --force-reinstall --no-deps --no-index --find-links .\target\wheels bcml
-for /f "delims=" %P in ('dir /b .build-venv\Lib\site-packages\bcml\bcml*.pyd') do copy /y ".build-venv\Lib\site-packages\bcml\%P" bcml\
-.build-venv\Scripts\python.exe -m PyInstaller --onedir --windowed --name BCML --distpath .\0dist --workpath .\build\pyinstaller --collect-all bcml --collect-all aamp --collect-all byml --collect-all botw_utils --collect-all rstb --icon bcml\data\bcml.ico --add-data ".build-venv\Lib\site-packages\aamp\botw_hashed_names.txt;aamp" bcml\__main__.py
+npm --prefix bcml/assets install
+npm --prefix bcml/assets run build
+python -m mkdocs build -d ./bcml/assets/help
+rustup run nightly maturin build --release --interpreter python
+uv pip install --force-reinstall --no-deps --no-index --find-links ./target/wheels bcml
+python -c "from pathlib import Path; import shutil; source = next(Path('.venv/Lib/site-packages/bcml').glob('bcml*.pyd')); shutil.copy2(source, 'bcml')"
+python -m PyInstaller --onedir --windowed --name BCML --distpath ./0dist --workpath ./build/pyinstaller --collect-all bcml --collect-all aamp --collect-all byml --collect-all botw_utils --collect-all rstb --icon bcml/data/bcml.ico --add-data ".venv/Lib/site-packages/aamp/botw_hashed_names.txt;aamp" bcml/__main__.py
 ```
 
 ### Quick Rebuild
 
 Use this after dependencies are already installed.
 
-```cmd
+```bash
 rustup run nightly cargo check
-npm --prefix bcml\assets run build
-rustup run nightly .build-venv\Scripts\maturin.exe build --release --interpreter .build-venv\Scripts\python.exe
-uv pip install --python .build-venv\Scripts\python.exe --force-reinstall --no-deps --no-index --find-links .\target\wheels bcml
-for /f "delims=" %P in ('dir /b .build-venv\Lib\site-packages\bcml\bcml*.pyd') do copy /y ".build-venv\Lib\site-packages\bcml\%P" bcml\
-.build-venv\Scripts\python.exe -m PyInstaller --onedir --windowed --name BCML --distpath .\0dist --workpath .\build\pyinstaller --collect-all bcml --collect-all aamp --collect-all byml --collect-all botw_utils --collect-all rstb --icon bcml\data\bcml.ico --add-data ".build-venv\Lib\site-packages\aamp\botw_hashed_names.txt;aamp" bcml\__main__.py
+npm --prefix bcml/assets run build
+rustup run nightly maturin build --release --interpreter python
+uv pip install --force-reinstall --no-deps --no-index --find-links ./target/wheels bcml
+python -c "from pathlib import Path; import shutil; source = next(Path('.venv/Lib/site-packages/bcml').glob('bcml*.pyd')); shutil.copy2(source, 'bcml')"
+python -m PyInstaller --onedir --windowed --name BCML --distpath ./0dist --workpath ./build/pyinstaller --collect-all bcml --collect-all aamp --collect-all byml --collect-all botw_utils --collect-all rstb --icon bcml/data/bcml.ico --add-data ".venv/Lib/site-packages/aamp/botw_hashed_names.txt;aamp" bcml/__main__.py
 ```
 
 ### Build wheel only
 
-```cmd
+```bash
 rustup run nightly cargo check
-npm --prefix bcml\assets run build
-.build-venv\Scripts\python.exe -m mkdocs build -d .\bcml\assets\help
-rustup run nightly .build-venv\Scripts\maturin.exe build --release --interpreter .build-venv\Scripts\python.exe
-uv pip install --python .build-venv\Scripts\python.exe --force-reinstall --no-deps --no-index --find-links .\target\wheels bcml
+npm --prefix bcml/assets run build
+python -m mkdocs build -d ./bcml/assets/help
+rustup run nightly maturin build --release --interpreter python
+uv pip install --force-reinstall --no-deps --no-index --find-links ./target/wheels bcml
 ```
 
 ## Usage and Troubleshooting
