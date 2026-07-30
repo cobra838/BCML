@@ -557,6 +557,8 @@ def get_data_dir() -> Path:
         data_dir = get_portable_dir() / "bcml-data"
     elif system() == "Windows":
         data_dir = Path(os.path.expandvars("%LOCALAPPDATA%")) / "bcml"
+    elif system() == "Darwin":
+        data_dir = Path.home() / "Library" / "Application Support" / "bcml"
     else:
         data_dir = Path.home() / ".config" / "bcml"
     if not data_dir.exists():
@@ -726,7 +728,7 @@ def get_emu_base_dir(emu_path: Union[str, Path]) -> Path:
         return path.parent
     return path
 def guess_export_dir_from_emu(
-    emu_path: Union[str, Path], wiiu: bool, export_layout_nx: str = "atmosphere"
+    emu_path: Union[str, Path], wiiu: bool, export_layout_nx: str = "emulator"
 ) -> Path:
     if not emu_path:
         raise FileNotFoundError("No emulator executable has been set.")
@@ -735,26 +737,42 @@ def guess_export_dir_from_emu(
         return base_dir / "graphicPacks"
 
     emu_key = Path(emu_path).name.lower()
-    appdata = Path(os.path.expandvars("%APPDATA%"))
 
-    def nx_layout_path(root: Path, family: str) -> Path:
-        if family == "ryujinx":
+    if "ryujinx" in emu_key:
+        root = base_dir / "portable"
+        if root.exists():
             if export_layout_nx == "emulator":
                 return root / "mods" / "contents"
-            return root / "portable" / "sdcard" / "atmosphere" / "contents"
+            return root / "sdcard" / "atmosphere" / "contents"
+        if system() == "Windows":
+            root = Path(os.path.expandvars("%APPDATA%")) / "Ryujinx"
+        elif system() == "Linux":
+            root = Path.home() / ".config" / "Ryujinx"
+        elif system() == "Darwin":
+            root = Path.home() / "Library" / "Application Support" / "Ryujinx"
+        else:
+            raise FileNotFoundError("BCML could not determine the Ryujinx data folder.")
         if export_layout_nx == "emulator":
-            return root / "user" / "load"
-        return root / "user" / "sdmc" / "atmosphere" / "contents"
-    if "ryujinx" in emu_key:
-        portable_root = base_dir / "portable"
-        if portable_root.exists():
-            return nx_layout_path(portable_root if export_layout_nx == "emulator" else base_dir, "ryujinx")
-        return nx_layout_path(appdata / "Ryujinx", "ryujinx")
+            return root / "mods" / "contents"
+        return root / "sdcard" / "atmosphere" / "contents"
+
     for family in ("yuzu", "eden", "citron"):
         if family in emu_key:
-            if (base_dir / "user").exists():
-                return nx_layout_path(base_dir, family)
-            return nx_layout_path(appdata / family, family)
+            root = base_dir / "user"
+            if not root.exists():
+                if system() == "Windows":
+                    root = Path(os.path.expandvars("%APPDATA%")) / family
+                elif system() == "Linux":
+                    root = Path.home() / ".local" / "share" / family
+                elif system() == "Darwin":
+                    root = Path.home() / "Library" / "Application Support" / family
+                else:
+                    raise FileNotFoundError(
+                        f"BCML could not determine the {family} data folder."
+                    )
+            if export_layout_nx == "emulator":
+                return root / "load"
+            return root / "sdmc" / "atmosphere" / "contents"
     raise FileNotFoundError(
         "BCML could not determine the default Output Folder for this emulator."
     )

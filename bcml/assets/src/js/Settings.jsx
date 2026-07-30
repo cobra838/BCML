@@ -608,11 +608,10 @@ class Settings extends React.Component {
                             <OverlayTrigger
                                 overlay={
                                     <Tooltip>
-                                        Choose how BCML writes the merged output.
-                                        Copy is safest for consoles. Hard links are
-                                        implemented with directory junctions on Windows.
-                                        Symlinks are fastest but may require extra
-                                        permissions.
+                                        Copy writes independent files. Hard links
+                                        use junctions on Windows and symlinks on
+                                        Linux/macOS. Symlink may require extra
+                                        permissions on Windows.
                                     </Tooltip>
                                 }
                                 placement={"left"}>
@@ -634,10 +633,17 @@ class Settings extends React.Component {
                             <OverlayTrigger
                                 overlay={
                                     <Tooltip>
-                                        With Named Folder creates
-                                        BreathOfTheWild_BCML inside the Output Folder.
-                                        Without Named Folder writes content and aoc
-                                        directly inside the Output Folder.
+                                        With Named Folder writes to:
+                                        <br />
+                                        <code>
+                                            Output Folder\BreathOfTheWild_BCML\mod folders
+                                        </code>
+                                        <br />
+                                        Without Named Folder writes to:
+                                        <br />
+                                        <code>
+                                            Output Folder\mod folders
+                                        </code>
                                     </Tooltip>
                                 }
                                 placement={"left"}>
@@ -661,10 +667,29 @@ class Settings extends React.Component {
                             <OverlayTrigger
                                 overlay={
                                     <Tooltip>
-                                        Atmosphere Layout exports title ID folders with
-                                        romfs directly inside them. Emulator Mod Layout
-                                        exports title ID folders with a
-                                        BreathOfTheWild_BCML mod folder inside each one.
+                                        Emulator Mod Layout for Yuzu:
+                                        <br />
+                                        <code>
+                                            root\load\01007EF00011XXXX\BreathOfTheWild_BCML\romfs
+                                        </code>
+                                        <br />
+                                        Ryujinx:
+                                        <br />
+                                        <code>
+                                            root\mods\contents\01007EF00011XXXX\BreathOfTheWild_BCML\romfs
+                                        </code>
+                                        <br />
+                                        Atmosphere Layout for Yuzu:
+                                        <br />
+                                        <code>
+                                            root\sdmc\atmosphere\contents\01007EF00011XXXX\romfs
+                                        </code>
+                                        <br />
+                                        Ryujinx:
+                                        <br />
+                                        <code>
+                                            root\sdcard\atmosphere\contents\01007EF00011XXXX\romfs
+                                        </code>
                                     </Tooltip>
                                 }
                                 placement={"left"}>

@@ -165,7 +165,7 @@ class Api:
                     entry: minidom.Element
                     path: str = entry.getElementsByTagName("path")[0].childNodes[0].data
                     if "U-King" in path:
-                        if SYSTEM == "Linux" and path[1:3] == ":\\":
+                        if (SYSTEM == "Linux" or SYSTEM == "Darwin") and path[1:3] == ":\\":
                             path = path[2:].replace("\\", "/")
                         game_dir = Path(path).parent.parent / "content"
                         break
@@ -173,7 +173,7 @@ class Api:
                 pass
             try:
                 mlc_str: str = settings.getElementsByTagName("mlc_path")[0].childNodes[0].data
-                if SYSTEM == "Linux" and mlc_str[1:3] == ":\\":
+                if (SYSTEM == "Linux" or SYSTEM == "Darwin") and mlc_str[1:3] == ":\\":
                     mlc_path = Path(mlc_str[2:].replace("\\", "/"))
                 else:
                     mlc_path = Path(mlc_str)
@@ -219,7 +219,7 @@ class Api:
             util.guess_export_dir_from_emu(
                 params["emu_path"],
                 params["wiiu"],
-                params.get("export_layout_nx", "atmosphere"),
+                params.get("export_layout_nx", "emulator"),
             )
         )
 

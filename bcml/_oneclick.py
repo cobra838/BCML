@@ -103,6 +103,9 @@ def process_arg(arg: str = None):
 def register_handlers():
     if system() == "Windows":
         _win_create_handler()
+    elif system() == "Darwin":
+        # Unsupported on macOS
+        pass
     else:
         _linux_create_handler()
 
