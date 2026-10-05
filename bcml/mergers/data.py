@@ -232,7 +232,7 @@ class GameDataMerger(mergers.Merger):
             return
         if glog_path.exists() and not force:
             with glog_path.open("r") as l_file:
-                if xxhash.xxh64_hexdigest(str(modded_entries)) == l_file.read():
+                if xxhash.xxh64_hexdigest(str(modded_entries).encode("utf-8")) == l_file.read():
                     print("No gamedata merging necessary.")
                     return
 
@@ -301,7 +301,7 @@ class GameDataMerger(mergers.Merger):
 
         glog_path.parent.mkdir(parents=True, exist_ok=True)
         with glog_path.open("w", encoding="utf-8") as l_file:
-            l_file.write(xxhash.xxh64_hexdigest(str(modded_entries)))
+            l_file.write(xxhash.xxh64_hexdigest(str(modded_entries).encode("utf-8")))
 
     def get_checkbox_options(self):
         return [("force", "Remerge game data even if no changes detected")]
@@ -417,7 +417,7 @@ class SaveDataMerger(mergers.Merger):
             return
         if slog_path.exists() and not force:
             with slog_path.open("r") as l_file:
-                if xxhash.xxh64_hexdigest(str(new_entries)) == l_file.read():
+                if xxhash.xxh64_hexdigest(str(new_entries).encode("utf-8")) == l_file.read():
                     print("No savedata merging necessary.")
                     return
 
@@ -515,7 +515,7 @@ class SaveDataMerger(mergers.Merger):
 
         slog_path.parent.mkdir(parents=True, exist_ok=True)
         with slog_path.open("w", encoding="utf-8") as l_file:
-            l_file.write(xxhash.xxh64_hexdigest(str(new_entries)))
+            l_file.write(xxhash.xxh64_hexdigest(str(new_entries).encode("utf-8")))
 
     def get_checkbox_options(self):
         return [("force", "Remerge save data even if no changes detected")]

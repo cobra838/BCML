@@ -11,4 +11,4 @@ QtPy; platform_system == 'Linux'
 PyYAML>=6.0
 requests>=2.26.0
 rstb>=1.2.2
-xxhash>=3.2
+xxhash==4.0.1
