@@ -32,13 +32,13 @@ $scrollbar-width: 0.5rem;
 }
 
 ::-webkit-scrollbar-track {
-    background: scale-color($fg-dark, $lightness: -10%);
+    background: color.scale($fg-dark, $lightness: -10%);
     border-radius: $scrollbar-width;
 }
 
 ::-webkit-scrollbar-thumb {
     border-radius: $scrollbar-width;
-    background: scale-color($color: $bg-lighter, $lightness: -25%);
+    background: color.scale($color: $bg-lighter, $lightness: -25%);
 }
 
 code {
@@ -47,7 +47,7 @@ code {
 
 blockquote {
     border-left: 4px solid $bg-lighter;
-    color: scale-color($color: $bg-lighter, $lightness: 25%);
+    color: color.scale($color: $bg-lighter, $lightness: 25%);
     padding-left: 1rem;
 }
 
