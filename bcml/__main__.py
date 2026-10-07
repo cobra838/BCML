@@ -138,7 +138,7 @@ def main(debug: bool = False):
         )
         width, height = 907, 680
 
-    api.window = webview.create_window(
+    window = webview.create_window(
         "BOTW Cross-Platform Mod Loader",
         url=url,
         js_api=api,
@@ -147,10 +147,11 @@ def main(debug: bool = False):
         height=height,
         min_size=(width if width == 750 else 820, 600),
     )
-    logger = Messager(api.window)
-    api.window.events.closing += stop_it
+    api._window = window
+    logger = Messager(window)
+    window.events.closing += stop_it
 
-    # messager = Messager(api.window)
+    # messager = Messager(window)
     # with redirect_stderr(sys.stdout):
     #     with redirect_stdout(messager):  # type: ignore
     sleep(0.25)

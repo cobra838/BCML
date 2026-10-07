@@ -55,7 +55,7 @@ def help_window(host: str):
 
 class Api:
     # pylint: disable=unused-argument,no-self-use,too-many-public-methods
-    window: webview.Window
+    _window: webview.Window
     host: str
     tmp_files: List[Path]
 
@@ -90,8 +90,8 @@ class Api:
             return path if path != "" else None
         else:
             if params and params.get("type") == "cemu_dir":
-                result = self.window.create_file_dialog(
-                    webview.OPEN_DIALOG,
+                result = self._window.create_file_dialog(
+                    webview.FileDialog.OPEN,
                     file_types=(
                         "Executable (*.exe)",
                         "All files (*)",
@@ -99,7 +99,7 @@ class Api:
                     allow_multiple=False,
                 )
             else:
-                result = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+                result = self._window.create_file_dialog(webview.FileDialog.FOLDER)
             return result[0] if result else None
 
     def dir_exists(self, params):
@@ -291,8 +291,8 @@ class Api:
         return mods
 
     def save_mod_list(self, params=None):
-        result = self.window.create_file_dialog(
-            webview.SAVE_DIALOG,
+        result = self._window.create_file_dialog(
+            webview.FileDialog.SAVE,
             file_types=("JSON File (*.json)",),
             allow_multiple=False,
         )
@@ -345,7 +345,7 @@ class Api:
     def file_pick(self, params=None):
         if not params:
             params = {}
-        result = self.window.create_file_dialog(
+        result = self._window.create_file_dialog(
             file_types=params.get(
                 "types",
                 (
@@ -646,7 +646,7 @@ class Api:
             open_dir = Path.home()
         try:
             file = Path(
-                self.window.create_file_dialog(
+                self._window.create_file_dialog(
                     directory=str(open_dir),
                     file_types=("BCML Backups (*.7z)", "All Files (*.*)"),
                 )[0]
@@ -674,8 +674,8 @@ class Api:
     def export(self):
         if not util.get_installed_mods():
             raise Exception("No mods installed to export.")
-        out = self.window.create_file_dialog(
-            webview.SAVE_DIALOG,
+        out = self._window.create_file_dialog(
+            webview.FileDialog.SAVE,
             file_types=(
                 f"{('Graphic Pack' if util.get_settings('wiiu') else 'Atmosphere')} (*.zip)",
                 "BOTW Nano Patch (*.bnp)",
@@ -694,8 +694,8 @@ class Api:
 
     @win_or_lose
     def create_bnp(self, params):
-        out = self.window.create_file_dialog(
-            webview.SAVE_DIALOG,
+        out = self._window.create_file_dialog(
+            webview.FileDialog.SAVE,
             file_types=("BOTW Nano Patch (*.bnp)", "All files (*.*)"),
             save_filename=util.get_safe_pathname(params["name"]) + ".bnp",
         )
@@ -726,8 +726,8 @@ class Api:
         bnp = Path(params["mod"])
         mod = install.open_mod(bnp)
         warnings = dev.convert_mod(mod, params["wiiu"], params["warn"])
-        out = self.window.create_file_dialog(
-            webview.SAVE_DIALOG,
+        out = self._window.create_file_dialog(
+            webview.FileDialog.SAVE,
             file_types=("BOTW Nano Patch (*.bnp)", "All files (*.*)"),
             save_filename=bnp.stem + f"_{'wiiu' if params['wiiu'] else 'switch'}.bnp",
         )
@@ -828,8 +828,8 @@ class Api:
                 merge_now=True,
                 options={"options": {"texts": {"all_langs": True}}, "disable": []},
             )
-            out = self.window.create_file_dialog(
-                webview.SAVE_DIALOG,
+            out = self._window.create_file_dialog(
+                webview.FileDialog.SAVE,
                 file_types=(
                     f"{('Graphic Pack' if util.get_settings('wiiu') else 'Atmosphere')} (*.zip)",
                     "BOTW Nano Patch (*.bnp)",
@@ -850,7 +850,7 @@ class Api:
 
     @win_or_lose
     def upgrade_bnp(self, params=None):
-        path = self.window.create_file_dialog(
+        path = self._window.create_file_dialog(
             file_types=tuple(["BOTW Nano Patch (*.bnp)"])
         )
         if not path:
@@ -859,8 +859,8 @@ class Api:
         if not path.exists():
             return
         tmp_dir = install.open_mod(path)
-        output = self.window.create_file_dialog(
-            webview.SAVE_DIALOG, file_types=tuple(["BOTW Nano Patch (*.bnp)"])
+        output = self._window.create_file_dialog(
+            webview.FileDialog.SAVE, file_types=tuple(["BOTW Nano Patch (*.bnp)"])
         )
         if not output:
             return

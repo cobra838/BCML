@@ -201,7 +201,7 @@ Installed 20 packages in 210ms
  + proxy-tools==0.1.0
  + pycparser==3.0
  + pythonnet==3.2.0
- + pywebview==3.7.2
+ + pywebview==6.2.1
  + pyyaml==6.0.3
  + requests==2.34.2
  + rstb==1.2.2
