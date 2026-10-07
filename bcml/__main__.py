@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from contextlib import redirect_stderr, redirect_stdout
@@ -12,6 +13,7 @@ from threading import Thread
 from time import sleep
 
 import webview
+from webview.dom import DOMEventHandler
 
 from bcml import DEBUG, util, _oneclick
 import bcml
@@ -67,6 +69,26 @@ def configure_cef(debug):
     settings.update(cef_settings)
     if not cache.exists():
         cache.mkdir(parents=True, exist_ok=True)
+
+
+def drag_and_drop(window):
+    def on_drop(event):
+        paths = [
+            file.get("pywebviewFullPath")
+            for file in event.get("dataTransfer", {}).get("files", [])
+        ]
+        paths = [path for path in paths if path and Path(path).is_file()]
+        if paths:
+            window.run_js(
+                f"{json.dumps(paths)}.forEach(path => window.oneClick(path));"
+            )
+
+    window.dom.document.events.dragover += DOMEventHandler(
+        lambda _: None, prevent_default=True, debounce=500
+    )
+    window.dom.document.events.drop += DOMEventHandler(
+        on_drop, prevent_default=True
+    )
 
 
 def main(debug: bool = False):
@@ -150,6 +172,8 @@ def main(debug: bool = False):
     api._window = window
     logger = Messager(window)
     window.events.closing += stop_it
+    if url.startswith(host):
+        window.events.loaded += lambda: drag_and_drop(window)
 
     # messager = Messager(window)
     # with redirect_stderr(sys.stdout):
